@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, Sparkles, Play, Zap, Film, Clapperboard, Star, TrendingUp, Smile, Music } from 'lucide-react';
+import { Upload, Sparkles, Play, Zap, Film, Clapperboard, Star, TrendingUp, Smile, Music, Download } from 'lucide-react';
 import { useStore } from '../store';
 
 export default function Home() {
@@ -70,32 +70,33 @@ export default function Home() {
 
       <main className="max-w-lg mx-auto px-4 space-y-8">
         <section>
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`relative p-8 border-2 border-dashed rounded-2xl transition-all cursor-pointer ${isDragging ? 'border-[#FF0050] bg-[#FF0050]/10' : 'border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:bg-gray-800'}`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-            />
-            <div className="flex flex-col items-center gap-4">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${isDragging ? 'bg-[#FF0050]' : 'bg-gray-700'}`}>
-                <Upload className="w-8 h-8" />
-              </div>
-              <div className="text-center">
-                <p className="font-semibold mb-1">
-                  {isDragging ? '松开上传视频' : '点击或拖拽上传视频'}
-                </p>
-                <p className="text-sm text-gray-400">支持 MP4、MOV、AVI 格式</p>
+          <label className="block cursor-pointer">
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`relative p-8 border-2 border-dashed rounded-2xl transition-all cursor-pointer ${isDragging ? 'border-[#FF0050] bg-[#FF0050]/10' : 'border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:bg-gray-800'}`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+              />
+              <div className="flex flex-col items-center gap-4">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${isDragging ? 'bg-[#FF0050]' : 'bg-gray-700'}`}>
+                  <Upload className="w-8 h-8" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold mb-1">
+                    {isDragging ? '松开上传视频' : '点击上传视频'}
+                  </p>
+                  <p className="text-sm text-gray-400">支持 MP4、MOV、AVI 格式</p>
+                </div>
               </div>
             </div>
-          </div>
+          </label>
         </section>
 
         <section>
@@ -159,6 +160,23 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="bg-gradient-to-r from-[#FF0050]/20 to-[#FF6B35]/20 rounded-2xl p-6 border border-[#FF0050]/30">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Zap className="w-5 h-5 text-[#FF0050]" />
+            一键部署到公网
+          </h3>
+          <p className="text-gray-400 text-sm mb-4">
+            下载部署包，30秒部署到免费服务器，手机随时随地使用！
+          </p>
+          <button
+            onClick={() => window.open('/download.html', '_blank')}
+            className="w-full py-3 bg-gradient-to-r from-[#FF0050] to-[#FF6B35] rounded-xl font-semibold text-white shadow-lg shadow-[#FF0050]/30 hover:shadow-[#FF0050]/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          >
+            <Download className="w-5 h-5" />
+            下载部署包
+          </button>
         </section>
       </main>
     </div>
