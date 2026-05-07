@@ -17,7 +17,7 @@ export default function AIEditor() {
   const navigate = useNavigate();
   const {
     video, selectedAIStyle, aiStyles, selectAIStyle, loadAIStyles,
-    aiEditTaskId, aiEditProgress, aiEditCurrentStep, aiEditCompleted, aiVideoUrl,
+    aiEditProgress, aiEditCurrentStep, aiEditCompleted, aiVideoUrl,
     startAIEdit, pollAIEditStatus,
     modelProvider, selectedModel, localModels, cloudModels,
     setModelProvider, selectModel, loadModels

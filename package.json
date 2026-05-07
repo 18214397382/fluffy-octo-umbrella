@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "vercel-build": "npx tsc -b && vite build"
+    "vercel-build": "vite build"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.4",
@@ -41,6 +41,6 @@
     "typescript-eslint": "^8.30.1"
   },
   "engines": {
-    "node": ">=18"
+    "node": "18.x"
   }
 }
