@@ -1,21 +1,16 @@
-import { Routes, Route } from 'react-router-dom';
-import { ProjectProvider } from './context/ProjectContext';
-import HomePage from './pages/HomePage';
-import EditPage from './pages/EditPage';
-import AIAnalysisPage from './pages/AIAnalysisPage';
-import ExportPage from './pages/ExportPage';
+import { HashRouter, Routes, Route } from 'react-router-dom'
+import Home from './pages/Home'
+import AIEditor from './pages/AIEditor'
 
 function App() {
   return (
-    <ProjectProvider>
+    <HashRouter>
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/edit" element={<EditPage />} />
-        <Route path="/ai-analysis" element={<AIAnalysisPage />} />
-        <Route path="/export" element={<ExportPage />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/ai-editor" element={<AIEditor />} />
       </Routes>
-    </ProjectProvider>
-  );
+    </HashRouter>
+  )
 }
 
-export default App;
+export default App
