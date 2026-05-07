@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node build.js",
+    "build": "node build.cjs",
     "lint": "eslint .",
     "preview": "vite preview",
-    "vercel-build": "node build.js"
+    "vercel-build": "node build.cjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.4",
