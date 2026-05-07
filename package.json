@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm ci && tsc -b && npx vite build",
+    "build": "npm ci && npx tsc -b && npx vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "vercel-build": "npm ci && npx tsc -b && npx vite build"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.4",

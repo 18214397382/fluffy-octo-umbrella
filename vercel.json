@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "chmod +x build.sh && ./build.sh",
   "functions": {
     "api/*.js": {
       "runtime": "@vercel/node"
