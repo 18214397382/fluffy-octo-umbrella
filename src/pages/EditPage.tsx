@@ -10,7 +10,7 @@ export default function EditPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [subtitles, setSubtitles] = useState<{start: number; end: number; text: string}[]>([]);
+  const [subtitles, _setSubtitles] = useState<{start: number; end: number; text: string}[]>([]);
   const [translatedSubtitles, setTranslatedSubtitles] = useState<{start: number; end: number; text: string}[]>([]);
   const [showTranslation, setShowTranslation] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
