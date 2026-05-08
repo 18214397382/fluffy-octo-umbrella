@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Play, SkipBack, SkipForward } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, SkipBack, SkipForward, Languages } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 
 export default function EditPage() {
@@ -10,6 +10,10 @@ export default function EditPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [subtitles, setSubtitles] = useState<{start: number; end: number; text: string}[]>([]);
+  const [translatedSubtitles, setTranslatedSubtitles] = useState<{start: number; end: number; text: string}[]>([]);
+  const [showTranslation, setShowTranslation] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   useEffect(() => {
     if (project?.videoUrl && videoRef.current) {
@@ -62,7 +66,7 @@ export default function EditPage() {
         </button>
       </header>
 
-      <div className="bg-black rounded-xl overflow-hidden aspect-video mb-4 relative">
+      <div className="bg-black rounded-xl overflow-hidden aspect-video mb-2 relative">
         <video
           ref={videoRef}
           className="w-full h-full object-contain"
@@ -78,6 +82,48 @@ export default function EditPage() {
             </button>
           </div>
         )}
+        {(showTranslation ? translatedSubtitles : subtitles).map((sub, i) => {
+          if (currentTime >= sub.start && currentTime <= sub.end) {
+            return (
+              <div key={i} className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
+                <span className="bg-black/70 text-white px-4 py-2 rounded-lg text-sm max-w-[90%] text-center">
+                  {sub.text}
+                </span>
+              </div>
+            );
+          }
+          return null;
+        })}
+      </div>
+
+      <div className="flex items-center justify-between mb-2">
+        <button
+          onClick={() => {
+            if (!showTranslation) {
+              setIsTranslating(true);
+              setTimeout(() => {
+                setTranslatedSubtitles(subtitles.map(s => ({
+                  ...s,
+                  text: '英语: ' + s.text + '\n中文: [翻译中...]'
+                })));
+                setIsTranslating(false);
+              }, 1000);
+            }
+            setShowTranslation(!showTranslation);
+          }}
+          disabled={isTranslating}
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm ${
+            showTranslation
+              ? 'bg-red-500 text-white'
+              : 'bg-gray-800 text-gray-300'
+          }`}
+        >
+          <Languages className="w-4 h-4" />
+          {isTranslating ? '翻译中...' : showTranslation ? '原文' : '翻译'}
+        </button>
+        <span className="text-xs text-gray-500">
+          {subtitles.length > 0 ? `${subtitles.length}条字幕` : ''}
+        </span>
       </div>
 
       <div className="bg-gray-800 rounded-xl p-4 mb-6">
