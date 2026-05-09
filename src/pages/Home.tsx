@@ -23,51 +23,29 @@ export default function Home() {
 
   const handleFileSelect = (file: File) => {
     try {
-      console.log('=== 文件选择开始 ===');
-      console.log('文件名:', file.name);
-      console.log('文件类型:', file.type);
-      console.log('文件大小:', file.size);
-      
       setUploadError('');
       
-      const validExtensions = ['.mp4', '.mov', '.avi', '.3gp', '.webm', '.mkv', '.flv', '.wmv', '.mpg', '.mpeg'];
-      const fileName = file.name.toLowerCase();
-      const isValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
-      const isValidMimeType = file.type.startsWith('video/') || file.type === '' || file.type === 'application/octet-stream';
-      
-      console.log('扩展名有效:', isValidExtension);
-      console.log('MIME类型有效:', isValidMimeType);
-      
-      if (!isValidExtension && !isValidMimeType) { 
-        setUploadError('请选择有效的视频文件（支持 MP4、MOV、AVI 等格式）'); 
-        console.log('文件类型无效');
-        return; 
+      if (!file.type.startsWith('video/') && !file.name.match(/\.(mp4|mov|avi|3gp|webm|mkv|flv|wmv|mpg|mpeg)$/i)) {
+        setUploadError('请选择有效的视频文件');
+        return;
       }
 
-      const maxSize = 1 * 1024 * 1024 * 1024;
-      if (file.size > maxSize) { 
-        setUploadError('视频文件不能超过1GB'); 
-        return; 
+      if (file.size > 1 * 1024 * 1024 * 1024) {
+        setUploadError('视频文件不能超过1GB');
+        return;
       }
 
-      console.log('创建 ObjectURL...');
       const url = URL.createObjectURL(file);
-      console.log('ObjectURL创建成功:', url);
       
-      const duration = file.size / (1024 * 1024) * 10;
-      console.log('设置视频状态...');
       setVideo({ 
         file, 
         url, 
         name: file.name, 
-        duration: duration, 
+        duration: Math.round(file.size / (1024 * 1024) * 10), 
         size: file.size 
       });
-      
-      console.log('视频状态设置成功');
     } catch (error) {
-      console.error('文件选择错误:', error);
-      setUploadError('上传失败，请重试: ' + (error as Error).message);
+      setUploadError('上传失败，请重试');
     }
   };
 
