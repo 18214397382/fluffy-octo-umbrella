@@ -9,4 +9,10 @@ export default defineConfig({
       '@': '/src',
     },
   },
+  server: {
+    allowedHosts: ['0022b07b88d145.lhr.life'],
+  },
+  preview: {
+    allowedHosts: ['0022b07b88d145.lhr.life'],
+  },
 })

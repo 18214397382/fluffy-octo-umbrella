@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview": "vite preview --host 0.0.0.0",
     "vercel-build": "./node_modules/.bin/vite build"
   },
   "dependencies": {
