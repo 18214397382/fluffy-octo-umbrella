@@ -37,20 +37,18 @@ app.use(
   },
 )
 
+app.use(express.static(path.join(__dirname, '..', 'dist')))
+
+app.get('*', (req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'))
+})
+
 app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Server Error:', error)
   res.status(500).json({
     success: false,
     error: 'Server internal error',
     message: error.message,
-  })
-})
-
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    error: 'API not found',
-    path: req.path,
   })
 })
 
