@@ -22,21 +22,43 @@ export default function Home() {
   }, [video]);
 
   const handleFileSelect = (file: File) => {
-    setUploadError('');
-    if (!file.type.startsWith('video/')) { setUploadError('请选择视频文件'); return; }
+    try {
+      setUploadError('');
+      
+      if (!file.type.startsWith('video/')) { 
+        setUploadError('请选择视频文件'); 
+        return; 
+      }
 
-    const maxSize = 1 * 1024 * 1024 * 1024;
-    if (file.size > maxSize) { setUploadError('视频文件不能超过1GB'); return; }
+      const maxSize = 1 * 1024 * 1024 * 1024;
+      if (file.size > maxSize) { 
+        setUploadError('视频文件不能超过1GB'); 
+        return; 
+      }
 
-    const url = URL.createObjectURL(file);
-    setVideo({ file, url, name: file.name, duration: 0, size: file.size });
-    
-    const videoElement = document.createElement('video');
-    videoElement.preload = 'metadata';
-    videoElement.onloadedmetadata = () => {
-      setVideo({ file, url, name: file.name, duration: videoElement.duration, size: file.size });
-    };
-    videoElement.src = url;
+      const url = URL.createObjectURL(file);
+      setVideo({ file, url, name: file.name, duration: 0, size: file.size });
+      
+      const videoElement = document.createElement('video');
+      videoElement.preload = 'metadata';
+      videoElement.onloadedmetadata = () => {
+        setVideo({ file, url, name: file.name, duration: videoElement.duration, size: file.size });
+      };
+      videoElement.onerror = () => {
+        console.log('无法加载视频元数据，使用默认值');
+      };
+      videoElement.src = url;
+      
+      setTimeout(() => {
+        const currentVideo = useStore.getState().video;
+        if (currentVideo && currentVideo.duration === 0) {
+          console.log('视频元数据加载超时，设置默认时长');
+        }
+      }, 5000);
+    } catch (error) {
+      console.error('文件选择错误:', error);
+      setUploadError('上传失败，请重试');
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };

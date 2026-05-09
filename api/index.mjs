@@ -1,7 +1,14 @@
-import app from './app.js';
+import { spawn } from 'child_process';
+import path from 'path';
 
-const PORT = process.env.PORT || 4173;
+const tsxPath = path.join(process.cwd(), 'node_modules', '.bin', 'tsx');
+const appPath = path.join(process.cwd(), 'api', 'app.ts');
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+const child = spawn(tsxPath, [appPath], {
+  stdio: 'inherit',
+  env: { ...process.env },
+});
+
+child.on('exit', (code) => {
+  process.exit(code ?? 1);
 });

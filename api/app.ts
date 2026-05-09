@@ -20,9 +20,20 @@ dotenv.config()
 
 const app: express.Application = express()
 
-app.use(cors())
-app.use(express.json({ limit: '50mb' }))
-app.use(express.urlencoded({ extended: true, limit: '50mb' }))
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
+  maxAge: 86400,
+}))
+
+app.use(express.json({ limit: '100mb' }))
+app.use(express.urlencoded({ extended: true, limit: '100mb' }))
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`)
+  next()
+})
 
 app.use('/api/ai-edit', aiEditRoutes)
 
@@ -50,6 +61,12 @@ app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
     error: 'Server internal error',
     message: error.message,
   })
+})
+
+const PORT = process.env.PORT || 4173
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`)
 })
 
 export default app
