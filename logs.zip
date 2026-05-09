@@ -1,0 +1,223 @@
+﻿2026-05-08T05:19:18.4314880Z Current runner version: '2.334.0'
+2026-05-08T05:19:18.4342034Z ##[group]Runner Image Provisioner
+2026-05-08T05:19:18.4343124Z Hosted Compute Agent
+2026-05-08T05:19:18.4343719Z Version: 20260213.493
+2026-05-08T05:19:18.4344455Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+2026-05-08T05:19:18.4345164Z Build Date: 2026-02-13T00:28:41Z
+2026-05-08T05:19:18.4345831Z Worker ID: {c5069455-46e9-4181-9322-416e2f369182}
+2026-05-08T05:19:18.4346591Z Azure Region: westus
+2026-05-08T05:19:18.4347095Z ##[endgroup]
+2026-05-08T05:19:18.4348599Z ##[group]Operating System
+2026-05-08T05:19:18.4349293Z Ubuntu
+2026-05-08T05:19:18.4349789Z 24.04.4
+2026-05-08T05:19:18.4350242Z LTS
+2026-05-08T05:19:18.4350800Z ##[endgroup]
+2026-05-08T05:19:18.4351318Z ##[group]Runner Image
+2026-05-08T05:19:18.4352181Z Image: ubuntu-24.04
+2026-05-08T05:19:18.4352815Z Version: 20260413.86.1
+2026-05-08T05:19:18.4354029Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260413.86/images/ubuntu/Ubuntu2404-Readme.md
+2026-05-08T05:19:18.4355635Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260413.86
+2026-05-08T05:19:18.4356530Z ##[endgroup]
+2026-05-08T05:19:18.4357684Z ##[group]GITHUB_TOKEN Permissions
+2026-05-08T05:19:18.4359841Z Contents: read
+2026-05-08T05:19:18.4360638Z Metadata: read
+2026-05-08T05:19:18.4361525Z Packages: read
+2026-05-08T05:19:18.4362574Z ##[endgroup]
+2026-05-08T05:19:18.4365188Z Secret source: Actions
+2026-05-08T05:19:18.4366329Z Prepare workflow directory
+2026-05-08T05:19:18.4733099Z Prepare all required actions
+2026-05-08T05:19:18.4772562Z Getting action download info
+2026-05-08T05:19:18.9448149Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-05-08T05:19:19.0696522Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-05-08T05:19:19.1559766Z Download action repository 'amondnet/vercel-action@v25' (SHA:16e87c0a08142b0d0d33b76aeaf20823c381b9b9)
+2026-05-08T05:19:19.6643628Z Complete job name: deploy
+2026-05-08T05:19:19.7360780Z ##[group]Run actions/checkout@v4
+2026-05-08T05:19:19.7361637Z with:
+2026-05-08T05:19:19.7362331Z   repository: 18214397382/fluffy-octo-umbrella
+2026-05-08T05:19:19.7363081Z   token: ***
+2026-05-08T05:19:19.7363487Z   ssh-strict: true
+2026-05-08T05:19:19.7363890Z   ssh-user: git
+2026-05-08T05:19:19.7364308Z   persist-credentials: true
+2026-05-08T05:19:19.7364760Z   clean: true
+2026-05-08T05:19:19.7365182Z   sparse-checkout-cone-mode: true
+2026-05-08T05:19:19.7365670Z   fetch-depth: 1
+2026-05-08T05:19:19.7366073Z   fetch-tags: false
+2026-05-08T05:19:19.7366491Z   show-progress: true
+2026-05-08T05:19:19.7366906Z   lfs: false
+2026-05-08T05:19:19.7367283Z   submodules: false
+2026-05-08T05:19:19.7367703Z   set-safe-directory: true
+2026-05-08T05:19:19.7368423Z ##[endgroup]
+2026-05-08T05:19:19.8492518Z Syncing repository: 18214397382/fluffy-octo-umbrella
+2026-05-08T05:19:19.8494487Z ##[group]Getting Git version info
+2026-05-08T05:19:19.8495428Z Working directory is '/home/runner/work/fluffy-octo-umbrella/fluffy-octo-umbrella'
+2026-05-08T05:19:19.8496528Z [command]/usr/bin/git version
+2026-05-08T05:19:19.8548976Z git version 2.53.0
+2026-05-08T05:19:19.8576224Z ##[endgroup]
+2026-05-08T05:19:19.8591197Z Temporarily overriding HOME='/home/runner/work/_temp/66f31837-1754-4b0c-bc78-08321649f3c0' before making global git config changes
+2026-05-08T05:19:19.8592933Z Adding repository directory to the temporary git global config as a safe directory
+2026-05-08T05:19:19.8604566Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/fluffy-octo-umbrella/fluffy-octo-umbrella
+2026-05-08T05:19:19.8637055Z Deleting the contents of '/home/runner/work/fluffy-octo-umbrella/fluffy-octo-umbrella'
+2026-05-08T05:19:19.8640138Z ##[group]Initializing the repository
+2026-05-08T05:19:19.8644708Z [command]/usr/bin/git init /home/runner/work/fluffy-octo-umbrella/fluffy-octo-umbrella
+2026-05-08T05:19:19.8732920Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-05-08T05:19:19.8734920Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-05-08T05:19:19.8736519Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-05-08T05:19:19.8737347Z hint: call:
+2026-05-08T05:19:19.8737760Z hint:
+2026-05-08T05:19:19.8738288Z hint: 	git config --global init.defaultBranch <name>
+2026-05-08T05:19:19.8738938Z hint:
+2026-05-08T05:19:19.8739731Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-05-08T05:19:19.8740759Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-05-08T05:19:19.8741564Z hint:
+2026-05-08T05:19:19.8742424Z hint: 	git branch -m <name>
+2026-05-08T05:19:19.8743158Z hint:
+2026-05-08T05:19:19.8744127Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-05-08T05:19:19.8745981Z Initialized empty Git repository in /home/runner/work/fluffy-octo-umbrella/fluffy-octo-umbrella/.git/
+2026-05-08T05:19:19.8748805Z [command]/usr/bin/git remote add origin https://github.com/18214397382/fluffy-octo-umbrella
+2026-05-08T05:19:19.8777688Z ##[endgroup]
+2026-05-08T05:19:19.8778835Z ##[group]Disabling automatic garbage collection
+2026-05-08T05:19:19.8781516Z [command]/usr/bin/git config --local gc.auto 0
+2026-05-08T05:19:19.8809779Z ##[endgroup]
+2026-05-08T05:19:19.8810838Z ##[group]Setting up auth
+2026-05-08T05:19:19.8816805Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-05-08T05:19:19.8846941Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-05-08T05:19:19.9129382Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-05-08T05:19:19.9160612Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-05-08T05:19:19.9378277Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-05-08T05:19:19.9417874Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-05-08T05:19:19.9640416Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-05-08T05:19:19.9676327Z ##[endgroup]
+2026-05-08T05:19:19.9684923Z ##[group]Fetching the repository
+2026-05-08T05:19:19.9686268Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +00994bf18050402d8a17ade077814f062a5b9aaa:refs/remotes/origin/master
+2026-05-08T05:19:20.4092765Z From https://github.com/18214397382/fluffy-octo-umbrella
+2026-05-08T05:19:20.4094200Z  * [new ref]         00994bf18050402d8a17ade077814f062a5b9aaa -> origin/master
+2026-05-08T05:19:20.4120535Z ##[endgroup]
+2026-05-08T05:19:20.4121627Z ##[group]Determining the checkout info
+2026-05-08T05:19:20.4123537Z ##[endgroup]
+2026-05-08T05:19:20.4129861Z [command]/usr/bin/git sparse-checkout disable
+2026-05-08T05:19:20.4166100Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-05-08T05:19:20.4191454Z ##[group]Checking out the ref
+2026-05-08T05:19:20.4195251Z [command]/usr/bin/git checkout --progress --force -B master refs/remotes/origin/master
+2026-05-08T05:19:20.4260020Z Reset branch 'master'
+2026-05-08T05:19:20.4263710Z branch 'master' set up to track 'origin/master'.
+2026-05-08T05:19:20.4271039Z ##[endgroup]
+2026-05-08T05:19:20.4304300Z [command]/usr/bin/git log -1 --format=%H
+2026-05-08T05:19:20.4326192Z 00994bf18050402d8a17ade077814f062a5b9aaa
+2026-05-08T05:19:20.4639721Z ##[group]Run actions/setup-node@v4
+2026-05-08T05:19:20.4640782Z with:
+2026-05-08T05:19:20.4641501Z   node-version: 18
+2026-05-08T05:19:20.4642620Z   always-auth: false
+2026-05-08T05:19:20.4643446Z   check-latest: false
+2026-05-08T05:19:20.4644771Z   token: ***
+2026-05-08T05:19:20.4645501Z ##[endgroup]
+2026-05-08T05:19:20.6497153Z Attempting to download 18...
+2026-05-08T05:19:21.4437718Z Acquiring 18.20.8 - x64 from https://github.com/actions/node-versions/releases/download/18.20.8-14110393767/node-18.20.8-linux-x64.tar.gz
+2026-05-08T05:19:21.9766480Z Extracting ...
+2026-05-08T05:19:21.9872127Z [command]/usr/bin/tar xz --strip 1 --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/4ca266a5-680a-440a-8e60-96a413ba7280 -f /home/runner/work/_temp/329b07e1-d157-4479-a8b1-47d6bc431329
+2026-05-08T05:19:22.9479504Z Adding to the cache ...
+2026-05-08T05:19:24.7706728Z ##[group]Environment details
+2026-05-08T05:19:25.0083080Z node: v18.20.8
+2026-05-08T05:19:25.0158707Z npm: 10.8.2
+2026-05-08T05:19:25.0159237Z yarn: 1.22.22
+2026-05-08T05:19:25.0160059Z ##[endgroup]
+2026-05-08T05:19:25.0248688Z ##[group]Run npm ci
+2026-05-08T05:19:25.0248998Z [36;1mnpm ci[0m
+2026-05-08T05:19:25.0275744Z shell: /usr/bin/bash -e {0}
+2026-05-08T05:19:25.0276040Z ##[endgroup]
+2026-05-08T05:19:25.9995435Z npm warn EBADENGINE Unsupported engine {
+2026-05-08T05:19:25.9996401Z npm warn EBADENGINE   package: '@tailwindcss/oxide@4.2.4',
+2026-05-08T05:19:25.9997312Z npm warn EBADENGINE   required: { node: '>= 20' },
+2026-05-08T05:19:25.9998236Z npm warn EBADENGINE   current: { node: 'v18.20.8', npm: '10.8.2' }
+2026-05-08T05:19:25.9998930Z npm warn EBADENGINE }
+2026-05-08T05:19:25.9999463Z npm warn EBADENGINE Unsupported engine {
+2026-05-08T05:19:26.0000217Z npm warn EBADENGINE   package: 'eslint-visitor-keys@5.0.1',
+2026-05-08T05:19:26.0001141Z npm warn EBADENGINE   required: { node: '^20.19.0 || ^22.13.0 || >=24' },
+2026-05-08T05:19:26.0002348Z npm warn EBADENGINE   current: { node: 'v18.20.8', npm: '10.8.2' }
+2026-05-08T05:19:26.0003007Z npm warn EBADENGINE }
+2026-05-08T05:19:26.0003713Z npm warn EBADENGINE Unsupported engine {
+2026-05-08T05:19:26.0004485Z npm warn EBADENGINE   package: 'eslint-visitor-keys@5.0.1',
+2026-05-08T05:19:26.0005386Z npm warn EBADENGINE   required: { node: '^20.19.0 || ^22.13.0 || >=24' },
+2026-05-08T05:19:26.0006376Z npm warn EBADENGINE   current: { node: 'v18.20.8', npm: '10.8.2' }
+2026-05-08T05:19:26.0007009Z npm warn EBADENGINE }
+2026-05-08T05:19:26.0007522Z npm warn EBADENGINE Unsupported engine {
+2026-05-08T05:19:26.0008301Z npm warn EBADENGINE   package: 'eslint-visitor-keys@5.0.1',
+2026-05-08T05:19:26.0009247Z npm warn EBADENGINE   required: { node: '^20.19.0 || ^22.13.0 || >=24' },
+2026-05-08T05:19:26.0010152Z npm warn EBADENGINE   current: { node: 'v18.20.8', npm: '10.8.2' }
+2026-05-08T05:19:26.0010775Z npm warn EBADENGINE }
+2026-05-08T05:19:26.0011308Z npm warn EBADENGINE Unsupported engine {
+2026-05-08T05:19:26.0012230Z npm warn EBADENGINE   package: 'eslint-visitor-keys@5.0.1',
+2026-05-08T05:19:26.0013131Z npm warn EBADENGINE   required: { node: '^20.19.0 || ^22.13.0 || >=24' },
+2026-05-08T05:19:26.0014036Z npm warn EBADENGINE   current: { node: 'v18.20.8', npm: '10.8.2' }
+2026-05-08T05:19:26.0014650Z npm warn EBADENGINE }
+2026-05-08T05:19:26.0026747Z npm warn EBADENGINE Unsupported engine {
+2026-05-08T05:19:26.0027550Z npm warn EBADENGINE   package: 'react-router-dom@7.15.0',
+2026-05-08T05:19:26.0028323Z npm warn EBADENGINE   required: { node: '>=20.0.0' },
+2026-05-08T05:19:26.0029143Z npm warn EBADENGINE   current: { node: 'v18.20.8', npm: '10.8.2' }
+2026-05-08T05:19:26.0029832Z npm warn EBADENGINE }
+2026-05-08T05:19:26.0030396Z npm warn EBADENGINE Unsupported engine {
+2026-05-08T05:19:26.0031073Z npm warn EBADENGINE   package: 'react-router@7.15.0',
+2026-05-08T05:19:26.0031996Z npm warn EBADENGINE   required: { node: '>=20.0.0' },
+2026-05-08T05:19:26.0032839Z npm warn EBADENGINE   current: { node: 'v18.20.8', npm: '10.8.2' }
+2026-05-08T05:19:26.0033474Z npm warn EBADENGINE }
+2026-05-08T05:19:26.0212625Z npm error code EUSAGE
+2026-05-08T05:19:26.0213922Z npm error
+2026-05-08T05:19:26.0216213Z npm error `npm ci` can only install packages when your package.json and package-lock.json or npm-shrinkwrap.json are in sync. Please update your lock file with `npm install` before continuing.
+2026-05-08T05:19:26.0218255Z npm error
+2026-05-08T05:19:26.0218979Z npm error Missing: negotiator@0.6.3 from lock file
+2026-05-08T05:19:26.0219902Z npm error Missing: readable-stream@2.3.8 from lock file
+2026-05-08T05:19:26.0220934Z npm error Invalid: lock file's debug@ does not satisfy debug@2.6.9
+2026-05-08T05:19:26.0222132Z npm error Missing: math-intrinsics@1.1.0 from lock file
+2026-05-08T05:19:26.0223192Z npm error Missing: brace-expansion@1.1.14 from lock file
+2026-05-08T05:19:26.0224088Z npm error Missing: minimist@1.2.8 from lock file
+2026-05-08T05:19:26.0225028Z npm error Invalid: lock file's debug@ does not satisfy debug@2.6.9
+2026-05-08T05:19:26.0225995Z npm error Missing: object-inspect@1.13.4 from lock file
+2026-05-08T05:19:26.0227146Z npm error Missing: object-inspect@1.13.4 from lock file
+2026-05-08T05:19:26.0228092Z npm error Missing: object-inspect@1.13.4 from lock file
+2026-05-08T05:19:26.0229027Z npm error Missing: object-inspect@1.13.4 from lock file
+2026-05-08T05:19:26.0229932Z npm error Missing: core-util-is@1.0.3 from lock file
+2026-05-08T05:19:26.0230774Z npm error Missing: isarray@1.0.0 from lock file
+2026-05-08T05:19:26.0231671Z npm error Missing: process-nextick-args@2.0.1 from lock file
+2026-05-08T05:19:26.0232869Z npm error Missing: safe-buffer@5.1.2 from lock file
+2026-05-08T05:19:26.0233757Z npm error Missing: string_decoder@1.1.1 from lock file
+2026-05-08T05:19:26.0234639Z npm error Missing: util-deprecate@1.0.2 from lock file
+2026-05-08T05:19:26.0235488Z npm error Missing: safe-buffer@5.1.2 from lock file
+2026-05-08T05:19:26.0236261Z npm error Missing: ms@2.0.0 from lock file
+2026-05-08T05:19:26.0237099Z npm error Missing: balanced-match@1.0.2 from lock file
+2026-05-08T05:19:26.0237966Z npm error Missing: concat-map@0.0.1 from lock file
+2026-05-08T05:19:26.0238773Z npm error Missing: ms@2.0.0 from lock file
+2026-05-08T05:19:26.0239362Z npm error
+2026-05-08T05:19:26.0239907Z npm error Clean install a project
+2026-05-08T05:19:26.0240471Z npm error
+2026-05-08T05:19:26.0240890Z npm error Usage:
+2026-05-08T05:19:26.0241417Z npm error npm ci
+2026-05-08T05:19:26.0242226Z npm error
+2026-05-08T05:19:26.0242853Z npm error Options:
+2026-05-08T05:19:26.0243782Z npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
+2026-05-08T05:19:26.0245074Z npm error [--global-style] [--omit <dev|optional|peer> [--omit <dev|optional|peer> ...]]
+2026-05-08T05:19:26.0246372Z npm error [--include <prod|dev|optional|peer> [--include <prod|dev|optional|peer> ...]]
+2026-05-08T05:19:26.0247680Z npm error [--strict-peer-deps] [--foreground-scripts] [--ignore-scripts] [--no-audit]
+2026-05-08T05:19:26.0248743Z npm error [--no-bin-links] [--no-fund] [--dry-run]
+2026-05-08T05:19:26.0249806Z npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+2026-05-08T05:19:26.0251032Z npm error [-ws|--workspaces] [--include-workspace-root] [--install-links]
+2026-05-08T05:19:26.0252104Z npm error
+2026-05-08T05:19:26.0252973Z npm error aliases: clean-install, ic, install-clean, isntall-clean
+2026-05-08T05:19:26.0253774Z npm error
+2026-05-08T05:19:26.0254235Z npm error Run "npm help ci" for more info
+2026-05-08T05:19:26.0255063Z npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-05-08T05_19_25_099Z-debug-0.log
+2026-05-08T05:19:26.0372883Z ##[error]Process completed with exit code 1.
+2026-05-08T05:19:26.0504150Z Post job cleanup.
+2026-05-08T05:19:26.1530010Z [command]/usr/bin/git version
+2026-05-08T05:19:26.1571202Z git version 2.53.0
+2026-05-08T05:19:26.1618798Z Temporarily overriding HOME='/home/runner/work/_temp/8c589e06-69ce-4cc9-afcb-4c6bfbd4e798' before making global git config changes
+2026-05-08T05:19:26.1620836Z Adding repository directory to the temporary git global config as a safe directory
+2026-05-08T05:19:26.1626247Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/fluffy-octo-umbrella/fluffy-octo-umbrella
+2026-05-08T05:19:26.1671132Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-05-08T05:19:26.1706219Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-05-08T05:19:26.1963670Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-05-08T05:19:26.1984435Z http.https://github.com/.extraheader
+2026-05-08T05:19:26.1998427Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-05-08T05:19:26.2030400Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-05-08T05:19:26.2257740Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-05-08T05:19:26.2289920Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-05-08T05:19:26.2624394Z Cleaning up orphan processes
+2026-05-08T05:19:26.3000287Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-node@v4. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
