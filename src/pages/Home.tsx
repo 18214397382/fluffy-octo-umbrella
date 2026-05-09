@@ -82,7 +82,7 @@ export default function Home() {
               className={`border-2 border-dashed rounded-2xl p-12 cursor-pointer transition-all ${
                 isDragging ? 'border-blue-500 bg-blue-500/10' : 'border-gray-600 bg-gray-800/50 hover:border-gray-500 hover:bg-gray-800'
               }`}>
-              <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileInputChange} className="hidden" />
+              <input ref={fileInputRef} type="file" accept="video/*,.mp4,.mov,.avi,.3gp,.webm,.mkv" onChange={handleFileInputChange} className="hidden" />
               <Upload className="w-16 h-16 mx-auto mb-4 text-gray-400" />
               <h3 className="text-xl font-medium mb-2">{isDragging ? '松开上传视频' : '点击上传视频'}</h3>
               <p className="text-gray-400">支持 MP4、MOV、AVI 等视频格式（最大1GB）</p>
