@@ -29,23 +29,13 @@ export default function Home() {
     if (file.size > maxSize) { setUploadError('视频文件不能超过1GB'); return; }
 
     const url = URL.createObjectURL(file);
+    setVideo({ file, url, name: file.name, duration: 0, size: file.size });
+    
     const videoElement = document.createElement('video');
     videoElement.preload = 'metadata';
-    
-    const timeout = setTimeout(() => {
-      setVideo({ file, url, name: file.name, duration: 0, size: file.size });
-    }, 3000);
-
     videoElement.onloadedmetadata = () => {
-      clearTimeout(timeout);
       setVideo({ file, url, name: file.name, duration: videoElement.duration, size: file.size });
     };
-    
-    videoElement.onerror = () => {
-      clearTimeout(timeout);
-      setVideo({ file, url, name: file.name, duration: 0, size: file.size });
-    };
-    
     videoElement.src = url;
   };
 
