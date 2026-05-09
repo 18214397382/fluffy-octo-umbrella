@@ -24,9 +24,16 @@ export default function Home() {
   const handleFileSelect = (file: File) => {
     try {
       setUploadError('');
+      console.log('选择文件:', file.name, file.type, file.size);
       
-      if (!file.type.startsWith('video/')) { 
-        setUploadError('请选择视频文件'); 
+      const validExtensions = ['.mp4', '.mov', '.avi', '.3gp', '.webm', '.mkv', '.flv', '.wmv'];
+      const fileName = file.name.toLowerCase();
+      const isValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+      const isValidMimeType = file.type.startsWith('video/') || file.type === '';
+      
+      if (!isValidExtension && !isValidMimeType) { 
+        setUploadError('请选择有效的视频文件（支持 MP4、MOV、AVI 等格式）'); 
+        console.log('文件类型无效:', file.type, fileName);
         return; 
       }
 
@@ -37,27 +44,31 @@ export default function Home() {
       }
 
       const url = URL.createObjectURL(file);
+      console.log('创建 ObjectURL:', url);
       setVideo({ file, url, name: file.name, duration: 0, size: file.size });
       
       const videoElement = document.createElement('video');
       videoElement.preload = 'metadata';
       videoElement.onloadedmetadata = () => {
+        console.log('元数据加载完成，时长:', videoElement.duration);
         setVideo({ file, url, name: file.name, duration: videoElement.duration, size: file.size });
       };
-      videoElement.onerror = () => {
-        console.log('无法加载视频元数据，使用默认值');
+      videoElement.onerror = (e) => {
+        console.error('视频元数据加载失败:', e);
+        setVideo({ file, url, name: file.name, duration: 60, size: file.size });
       };
       videoElement.src = url;
       
       setTimeout(() => {
         const currentVideo = useStore.getState().video;
         if (currentVideo && currentVideo.duration === 0) {
-          console.log('视频元数据加载超时，设置默认时长');
+          console.log('元数据加载超时，使用默认时长');
+          setVideo({ file, url, name: file.name, duration: 60, size: file.size });
         }
-      }, 5000);
+      }, 3000);
     } catch (error) {
       console.error('文件选择错误:', error);
-      setUploadError('上传失败，请重试');
+      setUploadError('上传失败，请重试: ' + (error as Error).message);
     }
   };
 
