@@ -23,17 +23,24 @@ export default function Home() {
 
   const handleFileSelect = (file: File) => {
     try {
-      setUploadError('');
-      console.log('选择文件:', file.name, file.type, file.size);
+      console.log('=== 文件选择开始 ===');
+      console.log('文件名:', file.name);
+      console.log('文件类型:', file.type);
+      console.log('文件大小:', file.size);
       
-      const validExtensions = ['.mp4', '.mov', '.avi', '.3gp', '.webm', '.mkv', '.flv', '.wmv'];
+      setUploadError('');
+      
+      const validExtensions = ['.mp4', '.mov', '.avi', '.3gp', '.webm', '.mkv', '.flv', '.wmv', '.mpg', '.mpeg'];
       const fileName = file.name.toLowerCase();
       const isValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
-      const isValidMimeType = file.type.startsWith('video/') || file.type === '';
+      const isValidMimeType = file.type.startsWith('video/') || file.type === '' || file.type === 'application/octet-stream';
+      
+      console.log('扩展名有效:', isValidExtension);
+      console.log('MIME类型有效:', isValidMimeType);
       
       if (!isValidExtension && !isValidMimeType) { 
         setUploadError('请选择有效的视频文件（支持 MP4、MOV、AVI 等格式）'); 
-        console.log('文件类型无效:', file.type, fileName);
+        console.log('文件类型无效');
         return; 
       }
 
@@ -43,29 +50,21 @@ export default function Home() {
         return; 
       }
 
+      console.log('创建 ObjectURL...');
       const url = URL.createObjectURL(file);
-      console.log('创建 ObjectURL:', url);
-      setVideo({ file, url, name: file.name, duration: 0, size: file.size });
+      console.log('ObjectURL创建成功:', url);
       
-      const videoElement = document.createElement('video');
-      videoElement.preload = 'metadata';
-      videoElement.onloadedmetadata = () => {
-        console.log('元数据加载完成，时长:', videoElement.duration);
-        setVideo({ file, url, name: file.name, duration: videoElement.duration, size: file.size });
-      };
-      videoElement.onerror = (e) => {
-        console.error('视频元数据加载失败:', e);
-        setVideo({ file, url, name: file.name, duration: 60, size: file.size });
-      };
-      videoElement.src = url;
+      const duration = file.size / (1024 * 1024) * 10;
+      console.log('设置视频状态...');
+      setVideo({ 
+        file, 
+        url, 
+        name: file.name, 
+        duration: duration, 
+        size: file.size 
+      });
       
-      setTimeout(() => {
-        const currentVideo = useStore.getState().video;
-        if (currentVideo && currentVideo.duration === 0) {
-          console.log('元数据加载超时，使用默认时长');
-          setVideo({ file, url, name: file.name, duration: 60, size: file.size });
-        }
-      }, 3000);
+      console.log('视频状态设置成功');
     } catch (error) {
       console.error('文件选择错误:', error);
       setUploadError('上传失败，请重试: ' + (error as Error).message);
