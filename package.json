@@ -1,49 +1,22 @@
-{
-  "name": "short-video-editor",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "main": "server.mjs",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "start": "npm run build && node api/index.mjs",
-    "lint": "eslint .",
-    "preview": "vite preview --host 0.0.0.0",
-    "vercel-build": "./node_modules/.bin/vite build"
-  },
-  "dependencies": {
-    "@tailwindcss/vite": "^4.2.4",
-    "@vitejs/plugin-react": "^4.4.1",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "lucide-react": "^1.14.0",
-    "multer": "^1.4.5-lts.1",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-router-dom": "^7.15.0",
-    "tailwindcss": "^4.2.4",
-    "typescript": "~5.8.3",
-    "vite": "^6.3.5",
-    "zustand": "^4.5.2"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.25.0",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/multer": "^1.4.11",
-    "@types/node": "^20.11.0",
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^19.1.2",
-    "eslint": "^9.25.0",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.19",
-    "globals": "^16.0.0",
-    "tsx": "^4.21.0",
-    "typescript-eslint": "^8.30.1"
-  },
-  "engines": {
-    "node": "18.x"
-  }
+﻿{
+    "name":  "short-video-editor",
+    "private":  true,
+    "version":  "1.0.0",
+    "type":  "module",
+    "main":  "api/index.mjs",
+    "scripts":  {
+                    "start":  "node api/index.mjs"
+                },
+    "dependencies":  {
+                         "dotenv":  "^16.4.5",
+                         "multer":  "^1.4.5-lts.1",
+                         "express":  "^4.19.2",
+                         "cors":  "^2.8.5"
+                     },
+    "devDependencies":  {
+
+                        },
+    "engines":  {
+                    "node":  "18.x"
+                }
 }
