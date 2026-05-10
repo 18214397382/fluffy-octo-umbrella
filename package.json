@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "start": "npx tsx api/app.ts",
+    "start": "node api/index.mjs",
     "lint": "eslint .",
     "preview": "vite preview --host 0.0.0.0",
     "vercel-build": "./node_modules/.bin/vite build"
