@@ -1,10 +1,10 @@
 {
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install && npm run build"
+    "buildCommand": "npm install && npm run build && echo 'BUILD_COMPLETE'"
   },
   "deploy": {
-    "startCommand": "node .",
+    "startCommand": "node server.mjs",
     "healthcheckPath": "/api/health",
     "restartPolicyType": "ON_FAILURE"
   }
