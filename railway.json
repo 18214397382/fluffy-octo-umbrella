@@ -1,10 +1,10 @@
 {
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install && npm run build && mv dist dist_bak"
+    "buildCommand": "npm install && npm run build"
   },
   "deploy": {
-    "startCommand": "mv dist_bak dist && node api/index.mjs",
+    "startCommand": "npm start",
     "healthcheckPath": "/api/health",
     "restartPolicyType": "ON_FAILURE"
   }
