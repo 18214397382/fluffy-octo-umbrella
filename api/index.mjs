@@ -206,7 +206,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-const distPath = path.join(__dirname, '..', 'dist');
+const distPath = path.join(__dirname, '..', 'frontend', 'dist');
+const frontendHtmlPath = path.join(__dirname, '..', 'frontend', 'index.html');
 app.use(express.static(distPath));
 
 app.get('*', (req, res) => {
