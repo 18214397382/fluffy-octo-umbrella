@@ -70,9 +70,11 @@ export default function Home() {
   };
   
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFileSelect(e.target.files[0]);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleFileSelect(files[0]);
     }
+    e.target.value = '';
   };
   
   const handleRemoveVideo = () => {
