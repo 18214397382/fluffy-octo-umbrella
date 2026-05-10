@@ -222,6 +222,10 @@ app.use((error, req, res, next) => {
   });
 });
 
+process.stdout.write(`RAILWAY_STARTUP: Node.js server starting on port ${PORT}\n`);
+process.stdout.write(`RAILWAY_STARTUP: Current dir: ${process.cwd()}\n`);
+process.stdout.write(`RAILWAY_STARTUP: Dist path: ${distPath}\n`);
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
