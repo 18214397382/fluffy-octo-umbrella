@@ -1,9 +1,19 @@
 {
+  "$schema": "https://schema.railpack.com/",
   "provider": "node",
   "packages": {
     "node": "18"
   },
+  "build": {
+    "commands": [
+      "npm install"
+    ]
+  },
   "deploy": {
-    "startCommand": "node api/index.mjs"
+    "startCommand": "node api/index.mjs",
+    "variables": {
+      "NODE_ENV": "production",
+      "NPM_CONFIG_PRODUCTION": "false"
+    }
   }
 }
