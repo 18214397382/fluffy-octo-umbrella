@@ -5,7 +5,13 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-COPY . .
+COPY frontend/package*.json ./frontend/
+WORKDIR /app/frontend
+RUN npm install && npm run build
+
+WORKDIR /app
+
+COPY api ./api
 
 EXPOSE ${PORT:-4173}
 
