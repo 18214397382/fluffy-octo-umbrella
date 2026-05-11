@@ -1,0 +1,9 @@
+{
+  "provider": "node",
+  "packages": {
+    "node": "18"
+  },
+  "deploy": {
+    "startCommand": "node api/index.mjs"
+  }
+}
