@@ -1,10 +1,9 @@
-﻿{
+﻿﻿{
   "build": {
-    "builder": "NIXPACKS",
-    "buildCommand": "npm install"
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "startCommand": "node api/index.mjs",
     "healthcheckPath": "/api/health",
     "restartPolicyType": "ON_FAILURE"
   }
