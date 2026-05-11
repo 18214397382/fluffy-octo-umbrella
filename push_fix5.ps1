@@ -1,4 +1,4 @@
-﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
+﻿﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
 git add server.mjs package.json railway.json
 git commit -m "Fix: add root server.mjs to force Node.js detection"
 $token = "$env:GITHUB_TOKEN"

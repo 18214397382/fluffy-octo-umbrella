@@ -1,4 +1,4 @@
-﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
+﻿﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
 git add api/index.mjs
 git commit -m "Fix: consolidate api/index.mjs into standalone entry point"
 $token = "$env:GITHUB_TOKEN"

@@ -1,4 +1,4 @@
-﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
+﻿﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
 git add railway.json
 git rm --cached Dockerfile
 git commit -m "Fix: hide dist during build to force Node.js start"

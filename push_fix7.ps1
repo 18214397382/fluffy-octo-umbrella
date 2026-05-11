@@ -1,4 +1,4 @@
-﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
+﻿﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
 git add railway.json
 git commit -m "Fix: force Node.js mode by ensuring dist is removed"
 git push origin master

@@ -1,4 +1,4 @@
-﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
+﻿﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
 
 Write-Host "1. Unstaging push-to-github.bat..."
 git restore --staged push-to-github.bat

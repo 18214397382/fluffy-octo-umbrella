@@ -1,4 +1,4 @@
-﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
+﻿﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
 
 Write-Host "1. Committing only Home.tsx changes..."
 git commit -m "Fix video upload handling"

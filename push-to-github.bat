@@ -1,4 +1,4 @@
-﻿﻿﻿@echo off
+﻿﻿﻿﻿﻿@echo off
 cd /d "%~dp0"
 echo 姝ｅ湪璁剧疆浠撳簱鍦板潃...
 echo.

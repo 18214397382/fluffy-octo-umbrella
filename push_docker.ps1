@@ -1,4 +1,4 @@
-﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
+﻿﻿cd "d:\Backup\Pictures\fluffy-octo-umbrella"
 git add Dockerfile railway.json
 git commit -m "Fix: use Dockerfile to ensure Node.js server starts properly"
 $token = "$env:GITHUB_TOKEN"
