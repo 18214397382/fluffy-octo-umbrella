@@ -5,6 +5,7 @@
   },
   "deploy": {
     "healthcheckPath": "/api/health",
-    "restartPolicyType": "ON_FAILURE"
+    "restartPolicyType": "ON_FAILURE",
+    "numReplicas": 1
   }
 }
