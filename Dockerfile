@@ -6,6 +6,7 @@ COPY package*.json ./
 RUN npm install
 
 COPY frontend/package*.json ./frontend/
+COPY frontend/postcss.config.js ./frontend/
 WORKDIR /app/frontend
 RUN npm install && npm run build
 
