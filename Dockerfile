@@ -8,7 +8,7 @@ RUN npm install
 COPY frontend/package*.json ./frontend/
 COPY frontend/postcss.config.js ./frontend/
 COPY frontend/vite.config.ts ./frontend/
-COPY frontend/index.html ./frontend/
+COPY frontend/index.template.html ./frontend/index.html
 COPY frontend/src ./frontend/src/
 WORKDIR /app/frontend
 RUN npm install && npm run build && ls -la dist/
