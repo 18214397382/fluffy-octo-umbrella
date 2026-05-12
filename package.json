@@ -2,11 +2,7 @@
   "name": "smart-video-backend",
   "version": "1.0.0",
   "scripts": {
-    "start": "node server.js",
-    "build": "echo 'Build completed'"
+    "start": "node simple-server.js"
   },
-  "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5"
-  }
+  "dependencies": {}
 }
