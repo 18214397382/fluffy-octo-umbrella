@@ -1,11 +1,15 @@
-const http = require('http');
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 4173;
 
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ success: true, message: 'Hello from Railway!' }));
+app.get('/', (req, res) => {
+  res.json({ success: true, message: 'Hello from Railway!' });
 });
 
-const PORT = process.env.PORT || 4173;
-server.listen(PORT, () => {
+app.get('/api/health', (req, res) => {
+  res.json({ success: true, message: 'OK', timestamp: new Date().toISOString() });
+});
+
+app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
