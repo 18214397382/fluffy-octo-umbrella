@@ -6,14 +6,14 @@
   },
   "build": {
     "commands": [
-      "npm install"
+      "cd frontend && npm install && npm run build",
+      "cd .. && npm install"
     ]
   },
   "deploy": {
     "startCommand": "node api/index.mjs",
     "variables": {
-      "NODE_ENV": "production",
-      "NPM_CONFIG_PRODUCTION": "false"
+      "NODE_ENV": "production"
     }
   }
 }
