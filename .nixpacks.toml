@@ -1,7 +1,0 @@
-[phases]
-install = "npm install"
-build = "echo 'No build needed'"
-start = "node simple-server.js"
-
-[env]
-PORT = "4173"
