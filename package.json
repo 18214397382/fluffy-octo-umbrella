@@ -1,10 +1,13 @@
 {
   "name": "smart-video-backend",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
-    "start": "node simple-server.js"
+    "start": "node api/index.mjs"
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.1"
   }
 }
