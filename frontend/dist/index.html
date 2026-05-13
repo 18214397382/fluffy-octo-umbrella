@@ -349,125 +349,167 @@ async function startEdit() {
   } else {
     if (!selectedFile) { showError('请选择视频文件'); return; }
     document.getElementById('statusText').textContent = '正在上传...';
-    await uploadToUpyun(selectedFile);
+    await uploadDirectly(selectedFile);
+  }
+}
+
+async function uploadDirectly(file) {
+  document.getElementById('progressFill').style.width = '2%';
+  document.getElementById('statusText').textContent = '正在连接服务器...';
+
+  try {
+    const healthRes = await fetch(`${API_BASE}/api/health`);
+    if (!healthRes.ok) {
+      document.getElementById('statusText').textContent = '服务器启动中，请稍候...';
+      await new Promise(r => setTimeout(r, 5000));
+    }
+
+    document.getElementById('progressFill').style.width = '5%';
+    document.getElementById('statusText').textContent = '正在上传视频...';
+
+    const formData = new FormData();
+    formData.append('video', file);
+    formData.append('style', selectedStyle);
+    formData.append('duration', document.getElementById('duration').value || '30');
+    formData.append('modelType', selectedModel);
+    formData.append('modelProvider', selectedModel.startsWith('cloud') ? 'cloud' : 'local');
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/api/ai-edit/start`, true);
+    xhr.timeout = 600000;
+
+    let lastProgress = 0;
+    let lastUpdate = Date.now();
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = 5 + Math.round((e.loaded / e.total) * 45);
+        document.getElementById('progressFill').style.width = pct + '%';
+        document.getElementById('statusText').textContent = `上传中 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
+        lastProgress = pct;
+        lastUpdate = Date.now();
+      }
+    };
+
+    const progressTimer = setInterval(() => {
+      if (Date.now() - lastUpdate > 3000 && lastProgress > 5) {
+        document.getElementById('statusText').textContent += ' .';
+        if (document.getElementById('statusText').textContent.length > 40) {
+          document.getElementById('statusText').textContent = '上传中，请耐心等待...';
+        }
+      }
+    }, 2000);
+
+    xhr.onload = async () => {
+      clearInterval(progressTimer);
+      if (xhr.status === 200) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.success) {
+            document.getElementById('progressFill').style.width = '55%';
+            document.getElementById('statusText').textContent = '上传完成，AI处理中...';
+            startPolling(data.taskId);
+          } else {
+            showError(data.message || '启动失败');
+          }
+        } catch (e) {
+          showError('响应解析错误');
+        }
+      } else {
+        showError('上传失败: ' + xhr.status);
+      }
+    };
+
+    xhr.ontimeout = () => {
+      clearInterval(progressTimer);
+      showError('上传超时，请尝试更小的视频文件');
+    };
+
+    xhr.onerror = () => {
+      clearInterval(progressTimer);
+      showError('网络错误，请检查网络后重试');
+    };
+
+    xhr.send(formData);
+  } catch (e) {
+    showError('上传错误: ' + e.message);
   }
 }
 
 async function uploadToUpyun(file) {
-  const CHUNK_SIZE = 5 * 1024 * 1024;
-  const CONCURRENT_UPLOADS = 3;
-  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  document.getElementById('progressFill').style.width = '3%';
+  document.getElementById('statusText').textContent = '正在连接服务器...';
 
-  if (totalChunks <= 1) {
-    await uploadSingleFile(file);
-    return;
+  const healthRes = await fetch(`${API_BASE}/api/health`).catch(() => null);
+  if (!healthRes || !healthRes.ok) {
+    document.getElementById('statusText').textContent = '服务器启动中，请稍候...';
+    await new Promise(r => setTimeout(r, 3000));
   }
 
-  document.getElementById('progressFill').style.width = '2%';
-  document.getElementById('statusText').textContent = `开始分块上传 (${totalChunks}块)...`;
+  document.getElementById('progressFill').style.width = '5%';
+  document.getElementById('statusText').textContent = '正在上传视频...';
 
-  const uploadedChunks = [];
-  let completedChunks = 0;
+  const formData = new FormData();
+  formData.append('video', file);
+  formData.append('style', selectedStyle);
+  formData.append('duration', document.getElementById('duration').value || '30');
+  formData.append('modelType', selectedModel);
+  formData.append('modelProvider', selectedModel.startsWith('cloud') ? 'cloud' : 'local');
 
-  const uploadChunk = async (chunkIndex) => {
-    const start = chunkIndex * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, file.size);
-    const chunk = file.slice(start, end);
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', `${API_BASE}/api/ai-edit/start`, true);
+  xhr.timeout = 600000;
 
-    for (let retry = 0; retry < 3; retry++) {
-      try {
-        const policyRes = await fetch(`${API_BASE}/api/upyun/policy`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileName: file.name,
-            fileSize: chunk.size,
-            chunkIndex,
-            totalChunks,
-          }),
-        });
-        const policyData = await policyRes.json();
-        if (!policyData.success) throw new Error('获取上传地址失败');
-
-        const form = new FormData();
-        form.append('policy', policyData.policy);
-        form.append('signature', policyData.signature);
-        form.append('file', chunk);
-
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', policyData.uploadUrl, false);
-
-        await new Promise((resolve, reject) => {
-          xhr.onload = () => {
-            if (xhr.status === 200 || xhr.status === 201) {
-              resolve();
-            } else {
-              reject(new Error(xhr.status));
-            }
-          };
-          xhr.onerror = () => reject(new Error('网络错误'));
-          xhr.send(form);
-        });
-
-        uploadedChunks[chunkIndex] = policyData.fileUrl;
-        completedChunks++;
-
-        const overallPct = 5 + Math.round((completedChunks / totalChunks) * 55);
-        document.getElementById('progressFill').style.width = overallPct + '%';
-        document.getElementById('statusText').textContent = `上传中 ${completedChunks}/${totalChunks} 块`;
-
-        return true;
-      } catch (e) {
-        if (retry === 2) console.error(`分块${chunkIndex}上传失败:`, e);
-        else await new Promise(r => setTimeout(r, 1000 * (retry + 1)));
-      }
+  let lastProgress = 0;
+  xhr.upload.onprogress = (e) => {
+    if (e.lengthComputable) {
+      const pct = 5 + Math.round((e.loaded / e.total) * 50);
+      document.getElementById('progressFill').style.width = pct + '%';
+      document.getElementById('statusText').textContent = `上传中 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
+      lastProgress = Date.now();
     }
-    return false;
   };
 
-  const chunkIndices = Array.from({ length: totalChunks }, (_, i) => i);
-  const results = [];
-
-  for (let i = 0; i < chunkIndices.length; i += CONCURRENT_UPLOADS) {
-    const batch = chunkIndices.slice(i, i + CONCURRENT_UPLOADS);
-    const batchResults = await Promise.all(batch.map(uploadChunk));
-    results.push(...batchResults);
-
-    if (batchResults.some(r => !r)) {
-      showError('部分分块上传失败，请重试');
-      return;
+  const keepAlive = setInterval(() => {
+    if (Date.now() - lastProgress > 3000) {
+      document.getElementById('statusText').textContent += '.';
+      if (document.getElementById('statusText').length > 40) {
+        document.getElementById('statusText').textContent = '上传中，请稍候...';
+      }
     }
-  }
+  }, 2000);
 
-  const validChunks = uploadedChunks.filter(Boolean);
-  if (validChunks.length !== totalChunks) {
-    showError(`上传不完整: ${validChunks.length}/${totalChunks}`);
-    return;
-  }
+  xhr.onload = async () => {
+    clearInterval(keepAlive);
+    if (xhr.status === 200) {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (data.success) {
+          document.getElementById('progressFill').style.width = '60%';
+          document.getElementById('statusText').textContent = '上传完成，AI处理中...';
+          startPolling(data.taskId);
+        } else {
+          showError(data.message || '启动失败');
+        }
+      } catch (e) {
+        showError('响应解析错误');
+      }
+    } else {
+      showError('上传失败: ' + xhr.status);
+    }
+  };
 
-  document.getElementById('progressFill').style.width = '65%';
-  document.getElementById('statusText').textContent = '上传完成，合并中...';
+  xhr.ontimeout = () => {
+    clearInterval(keepAlive);
+    showError('上传超时，请重试');
+  };
 
-  const mergeRes = await fetch(`${API_BASE}/api/upyun/merge`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chunks: uploadedChunks,
-      fileName: file.name,
-      style: selectedStyle,
-      duration: document.getElementById('duration').value || '30',
-      modelType: selectedModel,
-      modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
-    }),
-  });
+  xhr.onerror = () => {
+    clearInterval(keepAlive);
+    showError('网络错误，请重试');
+  };
 
-  const mergeData = await mergeRes.json();
-  if (mergeData.success) {
-    document.getElementById('progressFill').style.width = '70%';
-    startPolling(mergeData.taskId);
-  } else {
-    showError(mergeData.message || '合并失败');
-  }
+  xhr.send(formData);
 }
 
 async function uploadSingleFile(file) {

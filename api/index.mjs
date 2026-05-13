@@ -239,7 +239,7 @@ app.post('/api/upyun/policy', express.json(), (req, res) => {
   const policy = Buffer.from(JSON.stringify(policyObj)).toString('base64');
   const signature = crypto.createHmac('md5', UPYUN_PASSWORD).update(policy).digest('hex');
 
-  const uploadUrl = `https://v0.api.upyun.com/${UPYUN_BUCKET}/`;
+  const uploadUrl = `http://v0.api.upyun.com/${UPYUN_BUCKET}/`;
 
   res.status(200).json({
     success: true,
