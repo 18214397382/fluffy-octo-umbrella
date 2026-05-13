@@ -166,6 +166,68 @@ app.post('/api/ai-edit/start-url', async (req, res) => {
   }
 });
 
+app.use(express.raw({ type: 'application/octet-stream', limit: '200mb' }));
+
+const uploadSessions = new Map();
+
+app.post('/api/upload/init', express.json(), (req, res) => {
+  const { fileName, fileSize, totalChunks } = req.body;
+  const uploadId = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  uploadSessions.set(uploadId, {
+    fileName,
+    fileSize,
+    totalChunks,
+    chunks: new Map(),
+    createdAt: Date.now(),
+  });
+  res.status(200).json({ success: true, uploadId, chunkSize: 5 * 1024 * 1024 });
+});
+
+app.post('/api/upload/:uploadId/:chunkIndex', (req, res) => {
+  const session = uploadSessions.get(req.params.uploadId);
+  if (!session) { res.status(404).json({ success: false, message: 'Upload session not found' }); return; }
+  session.chunks.set(parseInt(req.params.chunkIndex), req.body);
+  res.status(200).json({ success: true });
+});
+
+app.post('/api/upload/complete/:uploadId', express.json(), async (req, res) => {
+  const session = uploadSessions.get(req.params.uploadId);
+  if (!session) { res.status(404).json({ success: false, message: 'Upload session not found' }); return; }
+  const { style, duration, modelType, modelProvider } = req.body;
+
+  const allChunks = [];
+  for (let i = 0; i < session.totalChunks; i++) {
+    const chunk = session.chunks.get(i);
+    if (!chunk) { res.status(400).json({ success: false, message: `Missing chunk ${i}` }); return; }
+    allChunks.push(chunk);
+  }
+
+  const buffer = Buffer.concat(allChunks.map(c => Buffer.from(c)));
+
+  const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  taskStore.set(taskId, {
+    status: 'processing',
+    progress: 0,
+    currentStep: '已接收视频，正在处理...',
+    createdAt: Date.now(),
+    modelType: modelType || 'local-basic',
+    modelProvider: modelProvider || 'local',
+    videoBuffer: buffer,
+    fileName: session.fileName,
+    fileMime: 'video/mp4',
+    style: style || 'trending',
+    duration: parseInt(duration || '30'),
+    addMusic: 'true',
+    addCaptions: 'true',
+    features: '[]',
+  });
+
+  uploadSessions.delete(req.params.uploadId);
+  setImmediate(() => processTask(taskId));
+
+  res.status(200).json({ success: true, taskId, message: 'AI剪辑任务已启动' });
+});
+
 app.get('/api/ai-edit/status/:taskId', async (req, res) => {
   try {
     const { taskId } = req.params;
