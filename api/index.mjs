@@ -206,19 +206,27 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+const distPath = path.join(__dirname, '..', 'frontend', 'dist');
+app.use(express.static(distPath));
+
 app.get('/', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Smart Video Backend API is running',
-    version: '1.0.0',
-    endpoints: {
-      health: '/api/health',
-      styles: '/api/ai-edit/styles',
-      models: '/api/ai-edit/models',
-      aiEdit: '/api/ai-edit/start',
-      status: '/api/ai-edit/status/:taskId',
-    },
-  });
+  const fs = await import('fs');
+  if (fs.existsSync(path.join(distPath, 'index.html'))) {
+    res.sendFile(path.join(distPath, 'index.html'));
+  } else {
+    res.status(200).json({
+      success: true,
+      message: 'Smart Video Backend API is running',
+      version: '1.0.0',
+      endpoints: {
+        health: '/api/health',
+        styles: '/api/ai-edit/styles',
+        models: '/api/ai-edit/models',
+        aiEdit: '/api/ai-edit/start',
+        status: '/api/ai-edit/status/:taskId',
+      },
+    });
+  }
 });
 
 app.use('/api', (req, res) => {
