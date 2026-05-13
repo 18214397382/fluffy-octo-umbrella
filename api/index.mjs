@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import multer from 'multer';
 import https from 'https';
 import http from 'http';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,6 +39,11 @@ app.use((req, res, next) => {
   req.setTimeout(300000);
   next();
 });
+
+const UPYUN_OPERATOR = process.env.UPYUN_OPERATOR || 'aiyun';
+const UPYUN_PASSWORD = process.env.UPYUN_PASSWORD || 'dMK698SWzvvEt888PwuUPoEgReMbvrC9';
+const UPYUN_BUCKET = process.env.UPYUN_BUCKET || 'ai-video-uploads';
+const UPYUN_ENDPOINT = `https://${UPYUN_BUCKET}.on.upyun.com`;
 
 app.use('/api/ai-edit/start', (req, res, next) => {
   req.setTimeout(600000);
@@ -172,6 +178,41 @@ app.use(express.json({ limit: '1mb' }));
 const uploadSessions = new Map();
 
 const PROXY_UPLOAD_LIMIT = 500 * 1024 * 1024;
+
+app.post('/api/upyun/policy', express.json(), (req, res) => {
+  const { fileName, fileSize } = req.body;
+  if (!fileName) {
+    res.status(400).json({ success: false, message: 'fileName is required' });
+    return;
+  }
+
+  const date = new Date().toISOString().replace(/[:-]/g, '').split('.')[0] + '000';
+  const saveKey = `uploads/${Date.now()}_${fileName}`;
+
+  const policy = Buffer.from(JSON.stringify({
+    bucket: UPYUN_BUCKET,
+    'save-key': `/${saveKey}`,
+    expiration: Math.floor(Date.now() / 1000) + 7200,
+    'content-length-range': '0,524288000',
+    'x-gmkerl-thumb': '',
+    'image-width-range': '',
+    'image-height-range': '',
+  })).toString('base64');
+
+  const signature = crypto.createHmac('sha1', UPYUN_PASSWORD).update(policy).digest('hex');
+
+  const uploadUrl = `https://v0.api.upyun.com/${UPYUN_BUCKET}`;
+
+  res.status(200).json({
+    success: true,
+    policy,
+    signature,
+    uploadUrl,
+    saveKey: '/' + saveKey,
+    operator: UPYUN_OPERATOR,
+    fileUrl: `${UPYUN_ENDPOINT}/${saveKey}`,
+  });
+});
 
 app.post('/api/proxy-upload', express.json(), (req, res) => {
   const { fileName, fileSize } = req.body;

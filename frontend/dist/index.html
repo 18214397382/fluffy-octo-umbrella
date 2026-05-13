@@ -264,50 +264,65 @@ async function startEdit() {
     } catch (e) { showError('网络错误: ' + e.message); }
   } else {
     if (!selectedFile) { showError('请选择视频文件'); return; }
-    document.getElementById('statusText').textContent = '正在上传到中转服务器...';
-    await uploadViaProxy(selectedFile);
+    document.getElementById('statusText').textContent = '正在上传...';
+    await uploadToUpyun(selectedFile);
   }
 }
 
-async function uploadViaProxy(file) {
-  document.getElementById('progressFill').style.width = '5%';
+async function uploadToUpyun(file) {
+  document.getElementById('progressFill').style.width = '3%';
   try {
-    const proxyRes = await fetch(`${API_BASE}/api/proxy-upload`, {
+    const policyRes = await fetch(`${API_BASE}/api/upyun/policy`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fileName: file.name, fileSize: file.size }),
     });
-    const proxyData = await proxyRes.json();
-    if (!proxyData.success) { showError('中转初始化失败'); return; }
+    const policyData = await policyRes.json();
+    if (!policyData.success) { showError('获取上传凭证失败'); return; }
 
-    const CHUNK_SIZE = 10 * 1024 * 1024;
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const form = new FormData();
+    form.append('policy', policyData.policy);
+    form.append('signature', policyData.signature);
+    form.append('save-key', policyData.saveKey);
+    form.append('operator', policyData.operator);
+    form.append('file', file);
 
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, file.size);
-      const chunk = file.slice(start, end);
-      const pct = 5 + Math.round(((i + 1) / totalChunks) * 45);
-      document.getElementById('progressFill').style.width = pct + '%';
-      document.getElementById('statusText').textContent = `上传中 ${i + 1}/${totalChunks} (${Math.round((i + 1) * CHUNK_SIZE / 1024 / 1024)}MB)...`;
+    document.getElementById('statusText').textContent = '上传到又拍云...';
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', policyData.uploadUrl, true);
 
-      const res = await fetch(`${API_BASE}/api/proxy-upload/${proxyData.uploadId}/${i}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        body: chunk,
-      });
-      if (!res.ok) { showError(`分片${i + 1}上传失败`); return; }
-    }
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = 3 + Math.round((e.loaded / e.total) * 47);
+        document.getElementById('progressFill').style.width = pct + '%';
+        document.getElementById('statusText').textContent = `上传中 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
+      }
+    };
 
-    document.getElementById('statusText').textContent = '上传完成，正在启动AI处理...';
-    const completeRes = await fetch(`${API_BASE}/api/proxy-upload/complete/${proxyData.uploadId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ style: selectedStyle, duration: document.getElementById('duration').value || '30', modelType: selectedModel, modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local' }),
-    });
-    const completeData = await completeRes.json();
-    if (completeData.success) startPolling(completeData.taskId);
-    else showError(completeData.message || '处理启动失败');
+    xhr.onload = async () => {
+      if (xhr.status === 200) {
+        document.getElementById('progressFill').style.width = '55%';
+        document.getElementById('statusText').textContent = '上传完成，启动AI处理...';
+        const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoUrl: policyData.fileUrl,
+            style: selectedStyle,
+            duration: document.getElementById('duration').value || '30',
+            modelType: selectedModel,
+            modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
+          }),
+        });
+        const startData = await startRes.json();
+        if (startData.success) startPolling(startData.taskId);
+        else showError(startData.message || '启动失败');
+      } else {
+        showError('又拍云上传失败: ' + xhr.status);
+      }
+    };
+    xhr.onerror = () => showError('上传网络错误');
+    xhr.send(form);
   } catch (e) { showError('上传错误: ' + e.message); }
 }
 
