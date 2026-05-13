@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 
@@ -210,7 +211,6 @@ const distPath = path.join(__dirname, '..', 'frontend', 'dist');
 app.use(express.static(distPath));
 
 app.get('/', (req, res) => {
-  const fs = await import('fs');
   if (fs.existsSync(path.join(distPath, 'index.html'))) {
     res.sendFile(path.join(distPath, 'index.html'));
   } else {
