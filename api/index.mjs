@@ -298,6 +298,97 @@ app.post('/api/upyun/merge', express.json(), async (req, res) => {
   }
 });
 
+app.post('/api/github-release/start', express.json(), async (req, res) => {
+  const { style, duration, modelType, modelProvider } = req.body;
+  const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+  const GITHUB_REPO = '18214397382/fluffy-octo-umbrella';
+
+  if (!GITHUB_TOKEN) {
+    res.status(400).json({ success: false, message: '未配置 GITHUB_TOKEN' });
+    return;
+  }
+
+  try {
+    const options = {
+      hostname: 'api.github.com',
+      path: `/repos/${GITHUB_REPO}/releases`,
+      headers: {
+        'User-Agent': 'fluffy-octo-umbrella',
+        'Authorization': `token ${GITHUB_TOKEN}`,
+      }
+    };
+
+    const releases = await new Promise((resolve, reject) => {
+      https.get(options, (resp) => {
+        let data = '';
+        resp.on('data', (chunk) => data += chunk);
+        resp.on('end', () => {
+          if (resp.statusCode === 200) resolve(JSON.parse(data));
+          else reject(new Error(`HTTP ${resp.statusCode}`));
+        });
+        resp.on('error', reject);
+      });
+    });
+
+    if (!releases || releases.length === 0) {
+      res.status(404).json({ success: false, message: '没有找到 Release' });
+      return;
+    }
+
+    const latestRelease = releases[0];
+    const assets = latestRelease.assets || [];
+
+    if (assets.length === 0) {
+      res.status(404).json({ success: false, message: 'Release 中没有附件' });
+      return;
+    }
+
+    const videoAsset = assets.find(asset => {
+      const ext = asset.name.split('.').pop().toLowerCase();
+      return ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv'].includes(ext);
+    });
+
+    if (!videoAsset) {
+      res.status(404).json({ success: false, message: 'Release 中没有找到视频文件' });
+      return;
+    }
+
+    const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    const tempDir = path.join(__dirname, 'temp', taskId);
+
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    taskStore.set(taskId, {
+      status: 'processing',
+      progress: 5,
+      currentStep: '正在从 GitHub Release 下载视频...',
+      createdAt: Date.now(),
+      modelType: modelType || 'local-model-1',
+      modelProvider: modelProvider || 'local',
+      style: style || 'cinematic',
+      duration: parseInt(duration) || 30,
+      videoUrl: videoAsset.browser_download_url,
+      fileName: videoAsset.name,
+      tempDir,
+      githubToken: GITHUB_TOKEN,
+    });
+
+    setImmediate(() => processUrlTask(taskId));
+
+    res.status(200).json({
+      success: true,
+      taskId,
+      message: '已从 GitHub Release 获取视频，开始处理',
+      videoName: videoAsset.name,
+    });
+  } catch (error) {
+    console.error('获取 GitHub Release 失败:', error);
+    res.status(500).json({ success: false, message: '获取失败: ' + error.message });
+  }
+});
+
 app.post('/api/proxy-upload', express.json(), (req, res) => {
   const { fileName, fileSize } = req.body;
   if (!fileName || !fileSize) {
