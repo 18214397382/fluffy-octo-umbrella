@@ -264,36 +264,27 @@ async function startEdit() {
     } catch (e) { showError('网络错误: ' + e.message); }
   } else {
     if (!selectedFile) { showError('请选择视频文件'); return; }
-    document.getElementById('statusText').textContent = '正在上传...';
-    await uploadToUpyun(selectedFile);
+    document.getElementById('statusText').textContent = '正在上传到服务器...';
+    await uploadDirectly(selectedFile);
   }
 }
 
-async function uploadToUpyun(file) {
-  document.getElementById('progressFill').style.width = '3%';
+async function uploadDirectly(file) {
+  document.getElementById('progressFill').style.width = '5%';
   try {
-    const policyRes = await fetch(`${API_BASE}/api/upyun/policy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName: file.name, fileSize: file.size }),
-    });
-    const policyData = await policyRes.json();
-    if (!policyData.success) { showError('获取上传凭证失败'); return; }
+    const formData = new FormData();
+    formData.append('video', file);
+    formData.append('style', selectedStyle);
+    formData.append('duration', document.getElementById('duration').value || '30');
+    formData.append('modelType', selectedModel);
+    formData.append('modelProvider', selectedModel.startsWith('cloud') ? 'cloud' : 'local');
 
-    const form = new FormData();
-    form.append('policy', policyData.policy);
-    form.append('signature', policyData.signature);
-    form.append('save-key', policyData.saveKey);
-    form.append('operator', policyData.operator);
-    form.append('file', file);
-
-    document.getElementById('statusText').textContent = '上传到又拍云...';
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', policyData.uploadUrl, true);
+    xhr.open('POST', `${API_BASE}/api/ai-edit/start`, true);
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
-        const pct = 3 + Math.round((e.loaded / e.total) * 47);
+        const pct = 5 + Math.round((e.loaded / e.total) * 45);
         document.getElementById('progressFill').style.width = pct + '%';
         document.getElementById('statusText').textContent = `上传中 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
       }
@@ -301,28 +292,24 @@ async function uploadToUpyun(file) {
 
     xhr.onload = async () => {
       if (xhr.status === 200) {
-        document.getElementById('progressFill').style.width = '55%';
-        document.getElementById('statusText').textContent = '上传完成，启动AI处理...';
-        const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            videoUrl: policyData.fileUrl,
-            style: selectedStyle,
-            duration: document.getElementById('duration').value || '30',
-            modelType: selectedModel,
-            modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
-          }),
-        });
-        const startData = await startRes.json();
-        if (startData.success) startPolling(startData.taskId);
-        else showError(startData.message || '启动失败');
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.success) {
+            document.getElementById('progressFill').style.width = '55%';
+            document.getElementById('statusText').textContent = '上传完成，AI处理中...';
+            startPolling(data.taskId);
+          } else {
+            showError(data.message || '启动失败');
+          }
+        } catch (e) {
+          showError('响应解析错误');
+        }
       } else {
-        showError('又拍云上传失败: ' + xhr.status);
+        showError('上传失败: ' + xhr.status);
       }
     };
     xhr.onerror = () => showError('上传网络错误');
-    xhr.send(form);
+    xhr.send(formData);
   } catch (e) { showError('上传错误: ' + e.message); }
 }
 
