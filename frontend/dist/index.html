@@ -270,8 +270,19 @@ async function startEdit() {
 }
 
 async function uploadDirectly(file) {
-  document.getElementById('progressFill').style.width = '5%';
+  document.getElementById('progressFill').style.width = '2%';
+  document.getElementById('statusText').textContent = '正在连接服务器...';
+  
   try {
+    const healthRes = await fetch(`${API_BASE}/api/health`);
+    if (!healthRes.ok) {
+      document.getElementById('statusText').textContent = '服务器正在启动，请稍候...';
+      await new Promise(r => setTimeout(r, 5000));
+    }
+    
+    document.getElementById('progressFill').style.width = '5%';
+    document.getElementById('statusText').textContent = '正在上传视频...';
+    
     const formData = new FormData();
     formData.append('video', file);
     formData.append('style', selectedStyle);
@@ -281,16 +292,29 @@ async function uploadDirectly(file) {
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${API_BASE}/api/ai-edit/start`, true);
+    xhr.timeout = 600000;
 
+    let lastUpdate = Date.now();
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
         const pct = 5 + Math.round((e.loaded / e.total) * 45);
         document.getElementById('progressFill').style.width = pct + '%';
         document.getElementById('statusText').textContent = `上传中 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
+        lastUpdate = Date.now();
       }
     };
 
+    const progressInterval = setInterval(() => {
+      if (Date.now() - lastUpdate > 5000) {
+        document.getElementById('statusText').textContent += '.';
+        if (document.getElementById('statusText').textContent.length > 50) {
+          document.getElementById('statusText').textContent = '上传中...';
+        }
+      }
+    }, 2000);
+
     xhr.onload = async () => {
+      clearInterval(progressInterval);
       if (xhr.status === 200) {
         try {
           const data = JSON.parse(xhr.responseText);
@@ -308,9 +332,21 @@ async function uploadDirectly(file) {
         showError('上传失败: ' + xhr.status);
       }
     };
-    xhr.onerror = () => showError('上传网络错误');
+    
+    xhr.ontimeout = () => {
+      clearInterval(progressInterval);
+      showError('上传超时，请重试');
+    };
+    
+    xhr.onerror = () => {
+      clearInterval(progressInterval);
+      showError('上传网络错误');
+    };
+    
     xhr.send(formData);
-  } catch (e) { showError('上传错误: ' + e.message); }
+  } catch (e) { 
+    showError('上传错误: ' + e.message); 
+  }
 }
 
 function startPolling(taskId) {
