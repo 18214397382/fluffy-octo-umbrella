@@ -86,17 +86,33 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   </div>
 
   <div class="card">
-    <h2>上传视频</h2>
-    <div class="upload-zone" id="uploadZone">
-      <div class="upload-icon">📹</div>
-      <div class="upload-text">点击或拖拽上传视频</div>
-      <div class="upload-hint">支持 MP4 / MOV / AVI，最大 1GB</div>
+    <h2>视频来源</h2>
+    <div style="display:flex;gap:12px;margin-bottom:16px">
+      <button class="model-tag active" id="tabUpload" onclick="switchTab('upload')">📁 本地上传</button>
+      <button class="model-tag" id="tabUrl" onclick="switchTab('url')">🔗 视频链接</button>
     </div>
-    <input type="file" id="fileInput" accept="video/*" style="display:none">
-    <div class="file-info" id="fileInfo">
-      <span>📁</span>
-      <span class="name" id="fileName"></span>
-      <span class="size" id="fileSize"></span>
+    <div id="uploadSection">
+      <div class="upload-zone" id="uploadZone">
+        <div class="upload-icon">📹</div>
+        <div class="upload-text">点击或拖拽上传视频</div>
+        <div class="upload-hint">支持 MP4 / MOV / AVI，最大 1GB</div>
+      </div>
+      <input type="file" id="fileInput" accept="video/*" style="display:none">
+      <div class="file-info" id="fileInfo">
+        <span>📁</span>
+        <span class="name" id="fileName"></span>
+        <span class="size" id="fileSize"></span>
+      </div>
+    </div>
+    <div id="urlSection" style="display:none">
+      <div class="form-group">
+        <label>视频直链 URL</label>
+        <input type="url" id="videoUrl" placeholder="https://example.com/video.mp4" style="background:#0f0f13;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#fff;font-size:14px;padding:12px;width:100%;outline:none">
+      </div>
+      <div class="file-info" id="urlInfo" style="display:none;margin-top:12px">
+        <span>🔗</span>
+        <span class="name" id="urlDisplay"></span>
+      </div>
     </div>
   </div>
 
@@ -137,6 +153,19 @@ let selectedFile = null;
 let selectedStyle = 'trending';
 let selectedModel = 'local-basic';
 let pollingTimer = null;
+let inputMode = 'upload';
+
+function switchTab(mode) {
+  inputMode = mode;
+  document.getElementById('tabUpload').classList.toggle('active', mode === 'upload');
+  document.getElementById('tabUrl').classList.toggle('active', mode === 'url');
+  document.getElementById('uploadSection').style.display = mode === 'upload' ? 'block' : 'none';
+  document.getElementById('urlSection').style.display = mode === 'url' ? 'block' : 'none';
+}
+
+function validateUrl(url) {
+  return url.match(/\.(mp4|mov|avi|webm|mkv)(\?.*)?$/i) || url.includes('cloud') || url.includes('video') || url.includes('storage') || url.includes('cdn');
+}
 
 async function loadStyles() {
   try {
@@ -186,6 +215,17 @@ document.getElementById('uploadZone').addEventListener('dragover', (e) => { e.pr
 document.getElementById('uploadZone').addEventListener('dragleave', () => document.getElementById('uploadZone').classList.remove('active'));
 document.getElementById('uploadZone').addEventListener('drop', (e) => { e.preventDefault(); document.getElementById('uploadZone').classList.remove('active'); handleFile(e.dataTransfer.files[0]); });
 document.getElementById('fileInput').addEventListener('change', (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+document.getElementById('videoUrl').addEventListener('input', function() {
+  const url = this.value.trim();
+  if (url) {
+    document.getElementById('urlDisplay').textContent = url;
+    document.getElementById('urlInfo').style.display = 'flex';
+    document.getElementById('startBtn').disabled = false;
+  } else {
+    document.getElementById('urlInfo').style.display = 'none';
+    if (inputMode === 'url') document.getElementById('startBtn').disabled = true;
+  }
+});
 
 function handleFile(file) {
   if (!file || !file.type.startsWith('video/')) { alert('请选择视频文件'); return; }
@@ -200,33 +240,50 @@ function handleFile(file) {
 document.getElementById('startBtn').addEventListener('click', startEdit);
 
 async function startEdit() {
-  if (!selectedFile) return;
   const btn = document.getElementById('startBtn');
   btn.disabled = true;
   btn.textContent = '处理中...';
   document.getElementById('statusCard').classList.add('show');
   document.getElementById('progressFill').style.width = '0';
-  document.getElementById('statusText').textContent = '正在上传...';
+  document.getElementById('statusText').textContent = '正在初始化...';
   document.getElementById('statusText').className = 'status-text processing';
   document.getElementById('resultVideo').classList.remove('show');
 
-  const form = new FormData();
-  form.append('video', selectedFile);
-  form.append('style', selectedStyle);
-  form.append('duration', document.getElementById('duration').value || '30');
-  form.append('modelType', selectedModel);
-  form.append('modelProvider', selectedModel.startsWith('cloud') ? 'cloud' : 'local');
+  const body = {
+    style: selectedStyle,
+    duration: document.getElementById('duration').value || '30',
+    modelType: selectedModel,
+    modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
+  };
 
-  try {
-    const res = await fetch(`${API_BASE}/api/ai-edit/start`, { method: 'POST', body: form });
-    const data = await res.json();
-    if (data.success) {
-      startPolling(data.taskId);
-    } else {
-      showError(data.message || '启动失败');
-    }
-  } catch (e) {
-    showError('网络错误: ' + e.message);
+  if (inputMode === 'url') {
+    const url = document.getElementById('videoUrl').value.trim();
+    if (!url) { showError('请输入视频链接'); return; }
+    body.videoUrl = url;
+    try {
+      const res = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.success) startPolling(data.taskId);
+      else showError(data.message || '启动失败');
+    } catch (e) { showError('网络错误: ' + e.message); }
+  } else {
+    if (!selectedFile) { showError('请选择视频文件'); return; }
+    const form = new FormData();
+    form.append('video', selectedFile);
+    form.append('style', selectedStyle);
+    form.append('duration', document.getElementById('duration').value || '30');
+    form.append('modelType', selectedModel);
+    form.append('modelProvider', selectedModel.startsWith('cloud') ? 'cloud' : 'local');
+    try {
+      const res = await fetch(`${API_BASE}/api/ai-edit/start`, { method: 'POST', body: form });
+      const data = await res.json();
+      if (data.success) startPolling(data.taskId);
+      else showError(data.message || '启动失败');
+    } catch (e) { showError('网络错误: ' + e.message); }
   }
 }
 

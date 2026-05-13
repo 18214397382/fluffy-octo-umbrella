@@ -4,6 +4,8 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
+import https from 'https';
+import http from 'http';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -101,6 +103,51 @@ app.post('/api/ai-edit/start', upload.single('video'), async (req, res) => {
     });
 
     setImmediate(() => processTask(taskId));
+
+    res.status(200).json({
+      success: true,
+      taskId,
+      message: 'AI剪辑任务已启动',
+      modelProvider,
+      modelType,
+    });
+  } catch (error) {
+    console.error('AI剪辑启动失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '启动AI剪辑失败',
+      error: error.message || 'Unknown error'
+    });
+  }
+});
+
+app.post('/api/ai-edit/start-url', async (req, res) => {
+  try {
+    const { videoUrl, style = 'trending', duration = 30, modelType = 'local-basic', modelProvider = 'local' } = req.body;
+
+    if (!videoUrl) {
+      res.status(400).json({ success: false, message: '视频URL是必需的' });
+      return;
+    }
+
+    const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+    taskStore.set(taskId, {
+      status: 'processing',
+      progress: 0,
+      currentStep: '正在从URL下载视频...',
+      createdAt: Date.now(),
+      modelType,
+      modelProvider,
+      videoUrl,
+      style,
+      duration: parseInt(duration),
+      addMusic: 'true',
+      addCaptions: 'true',
+      features: '[]',
+    });
+
+    setImmediate(() => processUrlTask(taskId));
 
     res.status(200).json({
       success: true,
@@ -270,6 +317,55 @@ async function processTask(taskId) {
   }
 
   simulateLocalProcessing(taskId, modelType);
+}
+
+function processUrlTask(taskId) {
+  const task = taskStore.get(taskId);
+  if (!task) return;
+  const { videoUrl, modelType } = task;
+
+  const protocol = videoUrl.startsWith('https') ? https : http;
+  protocol.get(videoUrl, (response) => {
+    const chunks = [];
+    let downloaded = 0;
+    const total = parseInt(response.headers['content-length'] || '0');
+
+    if (response.statusCode !== 200) {
+      taskStore.set(taskId, { ...taskStore.get(taskId), status: 'error', currentStep: `下载失败: HTTP ${response.statusCode}` });
+      return;
+    }
+
+    if (total > 1024 * 1024 * 1024) {
+      taskStore.set(taskId, { ...taskStore.get(taskId), status: 'error', currentStep: '视频超过1GB限制' });
+      return;
+    }
+
+    response.on('data', (chunk) => {
+      chunks.push(chunk);
+      downloaded += chunk.length;
+      const pct = Math.min(Math.round((downloaded / (total || downloaded)) * 30), 30);
+      taskStore.set(taskId, { ...taskStore.get(taskId), progress: pct, currentStep: `正在下载视频... ${(downloaded / 1024 / 1024).toFixed(1)}MB` });
+    });
+
+    response.on('end', () => {
+      taskStore.set(taskId, {
+        ...taskStore.get(taskId),
+        videoBuffer: Buffer.concat(chunks),
+        fileName: 'downloaded_video.mp4',
+        fileMime: response.headers['content-type'] || 'video/mp4',
+        progress: 30,
+        currentStep: '下载完成，正在处理...',
+      });
+      task.videoBuffer = Buffer.concat(chunks);
+      simulateLocalProcessing(taskId, modelType);
+    });
+
+    response.on('error', (e) => {
+      taskStore.set(taskId, { ...taskStore.get(taskId), status: 'error', currentStep: `下载错误: ${e.message}` });
+    });
+  }).on('error', (e) => {
+    taskStore.set(taskId, { ...taskStore.get(taskId), status: 'error', currentStep: `下载失败: ${e.message}` });
+  });
 }
 
 function simulateLocalProcessing(taskId, modelType) {
