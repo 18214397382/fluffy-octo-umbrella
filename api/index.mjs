@@ -167,12 +167,24 @@ app.post('/api/ai-edit/start-url', async (req, res) => {
 });
 
 app.use(express.raw({ type: 'application/octet-stream', limit: '200mb' }));
+app.use(express.json({ limit: '1mb' }));
 
 const uploadSessions = new Map();
 
-app.post('/api/upload/init', express.json(), (req, res) => {
-  const { fileName, fileSize, totalChunks } = req.body;
-  const uploadId = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+const PROXY_UPLOAD_LIMIT = 500 * 1024 * 1024;
+
+app.post('/api/proxy-upload', express.json(), (req, res) => {
+  const { fileName, fileSize } = req.body;
+  if (!fileName || !fileSize) {
+    res.status(400).json({ success: false, message: 'Missing fileName or fileSize' });
+    return;
+  }
+  if (fileSize > PROXY_UPLOAD_LIMIT) {
+    res.status(400).json({ success: false, message: 'File too large (max 500MB)' });
+    return;
+  }
+  const totalChunks = Math.ceil(fileSize / (10 * 1024 * 1024));
+  const uploadId = 'proxy_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   uploadSessions.set(uploadId, {
     fileName,
     fileSize,
@@ -180,17 +192,18 @@ app.post('/api/upload/init', express.json(), (req, res) => {
     chunks: new Map(),
     createdAt: Date.now(),
   });
-  res.status(200).json({ success: true, uploadId, chunkSize: 5 * 1024 * 1024 });
+  res.status(200).json({ success: true, uploadId, chunkSize: 10 * 1024 * 1024, totalChunks });
 });
 
-app.post('/api/upload/:uploadId/:chunkIndex', (req, res) => {
+app.post('/api/proxy-upload/:uploadId/:chunkIndex', (req, res) => {
   const session = uploadSessions.get(req.params.uploadId);
   if (!session) { res.status(404).json({ success: false, message: 'Upload session not found' }); return; }
   session.chunks.set(parseInt(req.params.chunkIndex), req.body);
-  res.status(200).json({ success: true });
+  const progress = Math.round((session.chunks.size / session.totalChunks) * 100);
+  res.status(200).json({ success: true, progress });
 });
 
-app.post('/api/upload/complete/:uploadId', express.json(), async (req, res) => {
+app.post('/api/proxy-upload/complete/:uploadId', express.json(), async (req, res) => {
   const session = uploadSessions.get(req.params.uploadId);
   if (!session) { res.status(404).json({ success: false, message: 'Upload session not found' }); return; }
   const { style, duration, modelType, modelProvider } = req.body;
@@ -198,8 +211,12 @@ app.post('/api/upload/complete/:uploadId', express.json(), async (req, res) => {
   const allChunks = [];
   for (let i = 0; i < session.totalChunks; i++) {
     const chunk = session.chunks.get(i);
-    if (!chunk) { res.status(400).json({ success: false, message: `Missing chunk ${i}` }); return; }
-    allChunks.push(chunk);
+    if (chunk) allChunks.push(chunk);
+  }
+
+  if (allChunks.length === 0) {
+    res.status(400).json({ success: false, message: 'No chunks received' });
+    return;
   }
 
   const buffer = Buffer.concat(allChunks.map(c => Buffer.from(c)));

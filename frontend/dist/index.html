@@ -264,34 +264,34 @@ async function startEdit() {
     } catch (e) { showError('网络错误: ' + e.message); }
   } else {
     if (!selectedFile) { showError('请选择视频文件'); return; }
-    await uploadChunks(selectedFile);
+    document.getElementById('statusText').textContent = '正在上传到中转服务器...';
+    await uploadViaProxy(selectedFile);
   }
 }
 
-async function uploadChunks(file) {
-  const CHUNK_SIZE = 5 * 1024 * 1024;
-  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-  document.getElementById('statusText').textContent = `准备上传 (共${totalChunks}片)...`;
-
+async function uploadViaProxy(file) {
+  document.getElementById('progressFill').style.width = '5%';
   try {
-    const initRes = await fetch(`${API_BASE}/api/upload/init`, {
+    const proxyRes = await fetch(`${API_BASE}/api/proxy-upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName: file.name, fileSize: file.size, totalChunks }),
+      body: JSON.stringify({ fileName: file.name, fileSize: file.size }),
     });
-    const initData = await initRes.json();
-    if (!initData.success) { showError('初始化上传失败'); return; }
-    const uploadId = initData.uploadId;
+    const proxyData = await proxyRes.json();
+    if (!proxyData.success) { showError('中转初始化失败'); return; }
+
+    const CHUNK_SIZE = 10 * 1024 * 1024;
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
     for (let i = 0; i < totalChunks; i++) {
       const start = i * CHUNK_SIZE;
       const end = Math.min(start + CHUNK_SIZE, file.size);
       const chunk = file.slice(start, end);
-      const pct = Math.round(((i + 1) / totalChunks) * 50);
+      const pct = 5 + Math.round(((i + 1) / totalChunks) * 45);
       document.getElementById('progressFill').style.width = pct + '%';
-      document.getElementById('statusText').textContent = `上传中 ${i + 1}/${totalChunks}...`;
+      document.getElementById('statusText').textContent = `上传中 ${i + 1}/${totalChunks} (${Math.round((i + 1) * CHUNK_SIZE / 1024 / 1024)}MB)...`;
 
-      const res = await fetch(`${API_BASE}/api/upload/${uploadId}/${i}`, {
+      const res = await fetch(`${API_BASE}/api/proxy-upload/${proxyData.uploadId}/${i}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/octet-stream' },
         body: chunk,
@@ -299,15 +299,15 @@ async function uploadChunks(file) {
       if (!res.ok) { showError(`分片${i + 1}上传失败`); return; }
     }
 
-    document.getElementById('statusText').textContent = '上传完成，合并中...';
-    const completeRes = await fetch(`${API_BASE}/api/upload/complete/${uploadId}`, {
+    document.getElementById('statusText').textContent = '上传完成，正在启动AI处理...';
+    const completeRes = await fetch(`${API_BASE}/api/proxy-upload/complete/${proxyData.uploadId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ style: selectedStyle, duration: document.getElementById('duration').value || '30', modelType: selectedModel, modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local' }),
     });
     const completeData = await completeRes.json();
     if (completeData.success) startPolling(completeData.taskId);
-    else showError(completeData.message || '合并失败');
+    else showError(completeData.message || '处理启动失败');
   } catch (e) { showError('上传错误: ' + e.message); }
 }
 
