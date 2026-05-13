@@ -90,6 +90,16 @@ app.post('/api/ai-edit/start', upload.single('video'), async (req, res) => {
     }
 
     const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    const tempFileName = `${taskId}_${req.file.originalname}`;
+    const tempFilePath = path.join(__dirname, 'temp', tempFileName);
+    
+    if (!fs.existsSync(path.join(__dirname, 'temp'))) {
+      fs.mkdirSync(path.join(__dirname, 'temp'), { recursive: true });
+    }
+    
+    await fs.promises.writeFile(tempFilePath, req.file.buffer);
+    
+    const videoUrl = `${req.protocol}://${req.get('host')}/api/temp/${taskId}`;
 
     taskStore.set(taskId, {
       status: 'processing',
@@ -98,7 +108,8 @@ app.post('/api/ai-edit/start', upload.single('video'), async (req, res) => {
       createdAt: Date.now(),
       modelType,
       modelProvider,
-      videoBuffer: req.file.buffer,
+      videoUrl,
+      tempFilePath,
       fileName: req.file.originalname,
       fileMime: req.file.mimetype,
       style,
@@ -116,6 +127,7 @@ app.post('/api/ai-edit/start', upload.single('video'), async (req, res) => {
       message: 'AI剪辑任务已启动',
       modelProvider,
       modelType,
+      videoUrl,
     });
   } catch (error) {
     console.error('AI剪辑启动失败:', error);
@@ -124,6 +136,30 @@ app.post('/api/ai-edit/start', upload.single('video'), async (req, res) => {
       message: '启动AI剪辑失败',
       error: error.message || 'Unknown error'
     });
+  }
+});
+
+app.get('/api/temp/:taskId', async (req, res) => {
+  const { taskId } = req.params;
+  const task = taskStore.get(taskId);
+  
+  if (!task || !task.tempFilePath) {
+    res.status(404).json({ success: false, message: '文件不存在或已过期' });
+    return;
+  }
+  
+  try {
+    if (fs.existsSync(task.tempFilePath)) {
+      res.setHeader('Content-Type', task.fileMime || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(task.fileName)}"`);
+      const stream = fs.createReadStream(task.tempFilePath);
+      stream.pipe(res);
+    } else {
+      res.status(404).json({ success: false, message: '文件已被删除' });
+    }
+  } catch (error) {
+    console.error('下载临时文件失败:', error);
+    res.status(500).json({ success: false, message: '下载失败' });
   }
 });
 
@@ -393,16 +429,35 @@ async function processTask(taskId) {
   const task = taskStore.get(taskId);
   if (!task) return;
 
-  const { modelProvider, videoBuffer, fileName, fileMime, style, duration, addMusic, addCaptions, features, modelType } = task;
+  const { modelProvider, videoBuffer, videoUrl, fileName, fileMime, style, duration, addMusic, addCaptions, features, modelType } = task;
+
+  let buffer = videoBuffer;
+  let name = fileName;
+  let mime = fileMime;
+
+  if (!buffer && videoUrl) {
+    taskStore.set(taskId, { ...taskStore.get(taskId), currentStep: '正在下载视频...', progress: 5 });
+    
+    try {
+      buffer = await downloadVideo(videoUrl);
+      name = name || 'downloaded_video.mp4';
+      mime = mime || 'video/mp4';
+      taskStore.set(taskId, { ...taskStore.get(taskId), progress: 30, currentStep: '下载完成，正在处理...' });
+    } catch (e) {
+      console.error('下载视频失败:', e.message);
+      taskStore.set(taskId, { ...taskStore.get(taskId), status: 'error', currentStep: `下载失败: ${e.message}` });
+      return;
+    }
+  }
 
   const API_KEY = process.env.NVAPI_KEY || '';
   const AI_API_BASE = process.env.AI_API_BASE || 'https://api.nvapi.io';
 
-  if (modelProvider === 'cloud' && API_KEY) {
+  if (modelProvider === 'cloud' && API_KEY && buffer) {
     try {
       const { FormData } = await import('form-data');
       const formData = new FormData();
-      formData.append('video', videoBuffer, { filename: fileName, contentType: fileMime });
+      formData.append('video', buffer, { filename: name, contentType: mime });
       formData.append('style', style);
       formData.append('duration', duration.toString());
       formData.append('addMusic', addMusic);
@@ -437,6 +492,23 @@ async function processTask(taskId) {
   }
 
   simulateLocalProcessing(taskId, modelType);
+}
+
+async function downloadVideo(url) {
+  return new Promise((resolve, reject) => {
+    const protocol = url.startsWith('https') ? https : http;
+    protocol.get(url, (response) => {
+      if (response.statusCode !== 200) {
+        reject(new Error(`HTTP ${response.statusCode}`));
+        return;
+      }
+
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => resolve(Buffer.concat(chunks)));
+      response.on('error', (e) => reject(e));
+    }).on('error', (e) => reject(e));
+  });
 }
 
 function processUrlTask(taskId) {
