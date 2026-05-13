@@ -86,66 +86,27 @@ app.post('/api/ai-edit/start', upload.single('video'), async (req, res) => {
     taskStore.set(taskId, {
       status: 'processing',
       progress: 0,
-      currentStep: '正在初始化...',
+      currentStep: '已接收视频，正在处理...',
       createdAt: Date.now(),
       modelType,
       modelProvider,
+      videoBuffer: req.file.buffer,
+      fileName: req.file.originalname,
+      fileMime: req.file.mimetype,
+      style,
+      duration: parseInt(duration),
+      addMusic,
+      addCaptions,
+      features,
     });
 
-    const API_KEY = process.env.NVAPI_KEY || '';
-    const AI_API_BASE = process.env.AI_API_BASE || 'https://api.nvapi.io';
+    setImmediate(() => processTask(taskId));
 
-    if (modelProvider === 'cloud' && API_KEY) {
-      try {
-        const { FormData } = await import('form-data');
-        const formData = new FormData();
-        formData.append('video', req.file.buffer, { filename: req.file.originalname, contentType: req.file.mimetype });
-        formData.append('style', style);
-        formData.append('duration', duration.toString());
-        formData.append('addMusic', addMusic);
-        formData.append('addCaptions', addCaptions);
-        formData.append('features', features);
-        formData.append('modelType', modelType);
-
-        const response = await fetch(`${AI_API_BASE}/v1/video/edit`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${API_KEY}` },
-          body: formData,
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          taskStore.set(taskId, {
-            ...taskStore.get(taskId),
-            status: 'processing',
-            progress: 10,
-            currentStep: '云端AI正在分析视频...'
-          });
-          res.status(200).json({
-            success: true,
-            taskId,
-            message: '云端AI剪辑任务已启动',
-            modelProvider: 'cloud',
-            modelType,
-            externalTaskId: data.taskId
-          });
-          return;
-        }
-      } catch (apiError) {
-        console.error('云端API调用失败，切换到本地处理:', apiError.message);
-        taskStore.set(taskId, {
-          ...taskStore.get(taskId),
-          currentStep: '云端连接失败，切换到本地模型...'
-        });
-      }
-    }
-
-    simulateLocalProcessing(taskId, req.file, modelType);
     res.status(200).json({
       success: true,
       taskId,
-      message: '本地AI剪辑任务已启动',
-      modelProvider: 'local',
+      message: 'AI剪辑任务已启动',
+      modelProvider,
       modelType,
     });
   } catch (error) {
@@ -261,7 +222,57 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-function simulateLocalProcessing(taskId, file, modelType) {
+async function processTask(taskId) {
+  const task = taskStore.get(taskId);
+  if (!task) return;
+
+  const { modelProvider, videoBuffer, fileName, fileMime, style, duration, addMusic, addCaptions, features, modelType } = task;
+
+  const API_KEY = process.env.NVAPI_KEY || '';
+  const AI_API_BASE = process.env.AI_API_BASE || 'https://api.nvapi.io';
+
+  if (modelProvider === 'cloud' && API_KEY) {
+    try {
+      const { FormData } = await import('form-data');
+      const formData = new FormData();
+      formData.append('video', videoBuffer, { filename: fileName, contentType: fileMime });
+      formData.append('style', style);
+      formData.append('duration', duration.toString());
+      formData.append('addMusic', addMusic);
+      formData.append('addCaptions', addCaptions);
+      formData.append('features', features);
+      formData.append('modelType', modelType);
+
+      const response = await fetch(`${AI_API_BASE}/v1/video/edit`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${API_KEY}` },
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        taskStore.set(taskId, {
+          ...taskStore.get(taskId),
+          status: 'processing',
+          progress: 10,
+          currentStep: '云端AI正在分析视频...',
+          externalTaskId: data.taskId,
+        });
+        return;
+      }
+    } catch (apiError) {
+      console.error('云端API调用失败，切换到本地处理:', apiError.message);
+      taskStore.set(taskId, {
+        ...taskStore.get(taskId),
+        currentStep: '云端连接失败，切换到本地模型...',
+      });
+    }
+  }
+
+  simulateLocalProcessing(taskId, modelType);
+}
+
+function simulateLocalProcessing(taskId, modelType) {
   const modelConfig = {
     'local-basic': { steps: 5, speed: 1, quality: '标准' },
     'local-standard': { steps: 7, speed: 0.8, quality: '高质量' },
