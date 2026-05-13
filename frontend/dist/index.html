@@ -354,6 +354,123 @@ async function startEdit() {
 }
 
 async function uploadToUpyun(file) {
+  const CHUNK_SIZE = 5 * 1024 * 1024;
+  const CONCURRENT_UPLOADS = 3;
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+  if (totalChunks <= 1) {
+    await uploadSingleFile(file);
+    return;
+  }
+
+  document.getElementById('progressFill').style.width = '2%';
+  document.getElementById('statusText').textContent = `开始分块上传 (${totalChunks}块)...`;
+
+  const uploadedChunks = [];
+  let completedChunks = 0;
+
+  const uploadChunk = async (chunkIndex) => {
+    const start = chunkIndex * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+
+    for (let retry = 0; retry < 3; retry++) {
+      try {
+        const policyRes = await fetch(`${API_BASE}/api/upyun/policy`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: file.name,
+            fileSize: chunk.size,
+            chunkIndex,
+            totalChunks,
+          }),
+        });
+        const policyData = await policyRes.json();
+        if (!policyData.success) throw new Error('获取上传地址失败');
+
+        const form = new FormData();
+        form.append('policy', policyData.policy);
+        form.append('signature', policyData.signature);
+        form.append('file', chunk);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', policyData.uploadUrl, false);
+
+        await new Promise((resolve, reject) => {
+          xhr.onload = () => {
+            if (xhr.status === 200 || xhr.status === 201) {
+              resolve();
+            } else {
+              reject(new Error(xhr.status));
+            }
+          };
+          xhr.onerror = () => reject(new Error('网络错误'));
+          xhr.send(form);
+        });
+
+        uploadedChunks[chunkIndex] = policyData.fileUrl;
+        completedChunks++;
+
+        const overallPct = 5 + Math.round((completedChunks / totalChunks) * 55);
+        document.getElementById('progressFill').style.width = overallPct + '%';
+        document.getElementById('statusText').textContent = `上传中 ${completedChunks}/${totalChunks} 块`;
+
+        return true;
+      } catch (e) {
+        if (retry === 2) console.error(`分块${chunkIndex}上传失败:`, e);
+        else await new Promise(r => setTimeout(r, 1000 * (retry + 1)));
+      }
+    }
+    return false;
+  };
+
+  const chunkIndices = Array.from({ length: totalChunks }, (_, i) => i);
+  const results = [];
+
+  for (let i = 0; i < chunkIndices.length; i += CONCURRENT_UPLOADS) {
+    const batch = chunkIndices.slice(i, i + CONCURRENT_UPLOADS);
+    const batchResults = await Promise.all(batch.map(uploadChunk));
+    results.push(...batchResults);
+
+    if (batchResults.some(r => !r)) {
+      showError('部分分块上传失败，请重试');
+      return;
+    }
+  }
+
+  const validChunks = uploadedChunks.filter(Boolean);
+  if (validChunks.length !== totalChunks) {
+    showError(`上传不完整: ${validChunks.length}/${totalChunks}`);
+    return;
+  }
+
+  document.getElementById('progressFill').style.width = '65%';
+  document.getElementById('statusText').textContent = '上传完成，合并中...';
+
+  const mergeRes = await fetch(`${API_BASE}/api/upyun/merge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chunks: uploadedChunks,
+      fileName: file.name,
+      style: selectedStyle,
+      duration: document.getElementById('duration').value || '30',
+      modelType: selectedModel,
+      modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
+    }),
+  });
+
+  const mergeData = await mergeRes.json();
+  if (mergeData.success) {
+    document.getElementById('progressFill').style.width = '70%';
+    startPolling(mergeData.taskId);
+  } else {
+    showError(mergeData.message || '合并失败');
+  }
+}
+
+async function uploadSingleFile(file) {
   document.getElementById('progressFill').style.width = '3%';
   try {
     document.getElementById('statusText').textContent = '正在获取上传地址...';
@@ -388,7 +505,7 @@ async function uploadToUpyun(file) {
       if (xhr.status === 200 || xhr.status === 201) {
         document.getElementById('progressFill').style.width = '60%';
         document.getElementById('statusText').textContent = '上传完成，启动AI处理...';
-        
+
         const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

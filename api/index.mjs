@@ -216,19 +216,24 @@ const uploadSessions = new Map();
 const PROXY_UPLOAD_LIMIT = 500 * 1024 * 1024;
 
 app.post('/api/upyun/policy', express.json(), (req, res) => {
-  const { fileName, fileSize } = req.body;
+  const { fileName, fileSize, chunkIndex, totalChunks } = req.body;
   if (!fileName) {
     res.status(400).json({ success: false, message: 'fileName is required' });
     return;
   }
 
-  const saveKey = `uploads/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+  const hasChunks = typeof chunkIndex === 'number' && typeof totalChunks === 'number';
+  const ext = fileName.split('.').pop();
+  const baseName = fileName.replace(/\.[^.]+$/, '');
+  const chunkSuffix = hasChunks ? `_part_${chunkIndex}_${totalChunks}` : '';
+  const finalExt = hasChunks && ext === 'mp4' ? '.webm' : (hasChunks ? '.mp4' : '');
+  const saveKey = `uploads/${Date.now()}_${baseName}${chunkSuffix}${finalExt}`;
 
   const policyObj = {
     bucket: UPYUN_BUCKET,
     'save-key': `/${saveKey}`,
-    expiration: Math.floor(Date.now() / 1000) + 3600,
-    'content-length-range': '0,524288000',
+    expiration: Math.floor(Date.now() / 1000) + 7200,
+    'content-length-range': '0,52428800',
   };
 
   const policy = Buffer.from(JSON.stringify(policyObj)).toString('base64');
@@ -244,7 +249,53 @@ app.post('/api/upyun/policy', express.json(), (req, res) => {
     saveKey: '/' + saveKey,
     operator: UPYUN_OPERATOR,
     fileUrl: `${UPYUN_ENDPOINT}/${saveKey}`,
+    isChunk: hasChunks,
+    chunkIndex,
+    totalChunks,
   });
+});
+
+app.post('/api/upyun/merge', express.json(), async (req, res) => {
+  const { chunks, fileName, style, duration, modelType, modelProvider } = req.body;
+  
+  if (!chunks || !Array.isArray(chunks) || chunks.length === 0) {
+    res.status(400).json({ success: false, message: 'chunks is required' });
+    return;
+  }
+
+  try {
+    const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    const tempDir = path.join(__dirname, 'temp', taskId);
+    
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    taskStore.set(taskId, {
+      status: 'processing',
+      progress: 5,
+      currentStep: '正在下载分块...',
+      createdAt: Date.now(),
+      modelType,
+      modelProvider,
+      style,
+      duration: parseInt(duration) || 30,
+      chunks,
+      tempDir,
+      fileName: fileName || 'merged_video.mp4',
+    });
+
+    setImmediate(() => downloadAndMergeChunks(taskId));
+
+    res.status(200).json({
+      success: true,
+      taskId,
+      message: 'AI剪辑任务已启动',
+    });
+  } catch (error) {
+    console.error('合并分块失败:', error);
+    res.status(500).json({ success: false, message: '合并失败' });
+  }
 });
 
 app.post('/api/proxy-upload', express.json(), (req, res) => {
@@ -506,6 +557,59 @@ async function downloadVideo(url) {
       response.on('error', (e) => reject(e));
     }).on('error', (e) => reject(e));
   });
+}
+
+async function downloadAndMergeChunks(taskId) {
+  const task = taskStore.get(taskId);
+  if (!task) return;
+
+  const { chunks, tempDir, modelType, modelProvider, style, duration } = task;
+  const totalChunks = chunks.length;
+
+  try {
+    const buffers = [];
+    for (let i = 0; i < totalChunks; i++) {
+      taskStore.set(taskId, {
+        ...taskStore.get(taskId),
+        progress: 5 + Math.round((i / totalChunks) * 25),
+        currentStep: `正在下载分块 ${i + 1}/${totalChunks}...`,
+      });
+
+      const buffer = await downloadVideo(chunks[i]);
+      buffers[i] = buffer;
+    }
+
+    taskStore.set(taskId, {
+      ...taskStore.get(taskId),
+      progress: 35,
+      currentStep: '正在合并分块...',
+    });
+
+    const mergedBuffer = Buffer.concat(buffers);
+    const ext = task.fileName.split('.').pop();
+    const finalName = task.fileName.replace(/\.[^.]+$/, '.mp4');
+    const mergedPath = path.join(tempDir, finalName);
+
+    await fs.promises.writeFile(mergedPath, mergedBuffer);
+
+    taskStore.set(taskId, {
+      ...taskStore.get(taskId),
+      videoBuffer: mergedBuffer,
+      fileName: finalName,
+      fileMime: 'video/mp4',
+      progress: 40,
+      currentStep: '分块合并完成，开始处理...',
+    });
+
+    simulateLocalProcessing(taskId, modelType);
+  } catch (e) {
+    console.error('下载合并分块失败:', e);
+    taskStore.set(taskId, {
+      ...taskStore.get(taskId),
+      status: 'error',
+      currentStep: `处理失败: ${e.message}`,
+    });
+  }
 }
 
 function processUrlTask(taskId) {
