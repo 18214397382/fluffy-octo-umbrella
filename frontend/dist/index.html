@@ -348,106 +348,68 @@ async function startEdit() {
     } catch (e) { showError('网络错误: ' + e.message); }
   } else {
     if (!selectedFile) { showError('请选择视频文件'); return; }
-    document.getElementById('statusText').textContent = '正在上传到服务器...';
-    await uploadDirectly(selectedFile);
+    document.getElementById('statusText').textContent = '正在上传...';
+    await uploadToUpyun(selectedFile);
   }
 }
 
-async function uploadDirectly(file) {
-  document.getElementById('progressFill').style.width = '2%';
-  document.getElementById('statusText').textContent = '正在连接服务器...';
-
-  let fileToUpload = file;
-  
-  if (file.size > 50 * 1024 * 1024) {
-    try {
-      document.getElementById('statusText').textContent = '正在压缩视频（稍等）...';
-      const compressed = await compressVideo(file);
-      const ratio = (compressed.size / file.size * 100).toFixed(0);
-      document.getElementById('statusText').textContent = `压缩完成！缩小到${ratio}%`;
-      await new Promise(r => setTimeout(r, 500));
-      fileToUpload = new File([compressed], file.name.replace(/\.[^.]+$/, '.webm'), { type: 'video/webm' });
-      document.getElementById('fileSize').textContent = (fileToUpload.size / 1024 / 1024).toFixed(1) + ' MB (已压缩)';
-    } catch (e) {
-      console.warn('压缩失败，使用原文件:', e);
-      fileToUpload = file;
-    }
-  }
-  
+async function uploadToUpyun(file) {
+  document.getElementById('progressFill').style.width = '3%';
   try {
-    const healthRes = await fetch(`${API_BASE}/api/health`);
-    if (!healthRes.ok) {
-      document.getElementById('statusText').textContent = '服务器正在启动，请稍候...';
-      await new Promise(r => setTimeout(r, 5000));
-    }
-    
+    document.getElementById('statusText').textContent = '正在获取上传地址...';
+    const policyRes = await fetch(`${API_BASE}/api/upyun/policy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName: file.name, fileSize: file.size }),
+    });
+    const policyData = await policyRes.json();
+    if (!policyData.success) { showError('获取上传地址失败'); return; }
+
     document.getElementById('progressFill').style.width = '5%';
-    document.getElementById('statusText').textContent = '正在上传视频...';
-    
-    const formData = new FormData();
-    formData.append('video', fileToUpload);
-    formData.append('style', selectedStyle);
-    formData.append('duration', document.getElementById('duration').value || '30');
-    formData.append('modelType', selectedModel);
-    formData.append('modelProvider', selectedModel.startsWith('cloud') ? 'cloud' : 'local');
+    document.getElementById('statusText').textContent = '正在上传到CDN...';
+
+    const form = new FormData();
+    form.append('policy', policyData.policy);
+    form.append('signature', policyData.signature);
+    form.append('file', file);
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_BASE}/api/ai-edit/start`, true);
-    xhr.timeout = 600000;
+    xhr.open('POST', policyData.uploadUrl, true);
 
-    let lastUpdate = Date.now();
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
-        const pct = 5 + Math.round((e.loaded / e.total) * 45);
+        const pct = 5 + Math.round((e.loaded / e.total) * 50);
         document.getElementById('progressFill').style.width = pct + '%';
         document.getElementById('statusText').textContent = `上传中 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
-        lastUpdate = Date.now();
       }
     };
-
-    const progressInterval = setInterval(() => {
-      if (Date.now() - lastUpdate > 5000) {
-        document.getElementById('statusText').textContent += '.';
-        if (document.getElementById('statusText').textContent.length > 50) {
-          document.getElementById('statusText').textContent = '上传中...';
-        }
-      }
-    }, 2000);
 
     xhr.onload = async () => {
-      clearInterval(progressInterval);
-      if (xhr.status === 200) {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          if (data.success) {
-            document.getElementById('progressFill').style.width = '55%';
-            document.getElementById('statusText').textContent = '上传完成，AI处理中...';
-            startPolling(data.taskId);
-          } else {
-            showError(data.message || '启动失败');
-          }
-        } catch (e) {
-          showError('响应解析错误');
-        }
+      if (xhr.status === 200 || xhr.status === 201) {
+        document.getElementById('progressFill').style.width = '60%';
+        document.getElementById('statusText').textContent = '上传完成，启动AI处理...';
+        
+        const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoUrl: policyData.fileUrl,
+            style: selectedStyle,
+            duration: document.getElementById('duration').value || '30',
+            modelType: selectedModel,
+            modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
+          }),
+        });
+        const startData = await startRes.json();
+        if (startData.success) startPolling(startData.taskId);
+        else showError(startData.message || '启动失败');
       } else {
-        showError('上传失败: ' + xhr.status);
+        showError('上传失败: ' + xhr.status + ' ' + xhr.responseText);
       }
     };
-    
-    xhr.ontimeout = () => {
-      clearInterval(progressInterval);
-      showError('上传超时，请重试');
-    };
-    
-    xhr.onerror = () => {
-      clearInterval(progressInterval);
-      showError('上传网络错误');
-    };
-    
-    xhr.send(formData);
-  } catch (e) { 
-    showError('上传错误: ' + e.message); 
-  }
+    xhr.onerror = () => showError('网络错误，请重试');
+    xhr.send(form);
+  } catch (e) { showError('上传错误: ' + e.message); }
 }
 
 function startPolling(taskId) {

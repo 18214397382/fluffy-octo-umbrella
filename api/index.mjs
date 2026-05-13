@@ -222,22 +222,19 @@ app.post('/api/upyun/policy', express.json(), (req, res) => {
     return;
   }
 
-  const date = new Date().toISOString().replace(/[:-]/g, '').split('.')[0] + '000';
-  const saveKey = `uploads/${Date.now()}_${fileName}`;
+  const saveKey = `uploads/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 
-  const policy = Buffer.from(JSON.stringify({
+  const policyObj = {
     bucket: UPYUN_BUCKET,
     'save-key': `/${saveKey}`,
-    expiration: Math.floor(Date.now() / 1000) + 7200,
+    expiration: Math.floor(Date.now() / 1000) + 3600,
     'content-length-range': '0,524288000',
-    'x-gmkerl-thumb': '',
-    'image-width-range': '',
-    'image-height-range': '',
-  })).toString('base64');
+  };
 
-  const signature = crypto.createHmac('sha1', UPYUN_PASSWORD).update(policy).digest('hex');
+  const policy = Buffer.from(JSON.stringify(policyObj)).toString('base64');
+  const signature = crypto.createHmac('md5', UPYUN_PASSWORD).update(policy).digest('hex');
 
-  const uploadUrl = `https://v0.api.upyun.com/${UPYUN_BUCKET}`;
+  const uploadUrl = `https://v0.api.upyun.com/${UPYUN_BUCKET}/`;
 
   res.status(200).json({
     success: true,
