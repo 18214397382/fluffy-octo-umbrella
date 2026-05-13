@@ -27,8 +27,20 @@ app.use((req, res, next) => {
 });
 
 const upload = multer({
-  limits: { fileSize: 1024 * 1024 * 1024 },
+  limits: { fileSize: 1024 * 1024 * 1024, fieldSize: 1024 * 1024 * 1024 },
   storage: multer.memoryStorage()
+});
+
+app.use((req, res, next) => {
+  res.setTimeout(300000);
+  req.setTimeout(300000);
+  next();
+});
+
+app.use('/api/ai-edit/start', (req, res, next) => {
+  req.setTimeout(600000);
+  res.setTimeout(600000);
+  next();
 });
 
 const taskStore = new Map();
