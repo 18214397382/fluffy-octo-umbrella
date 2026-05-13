@@ -84,9 +84,9 @@ app.post('/api/ai-edit/start', upload.single('video'), async (req, res) => {
 
     if (modelProvider === 'cloud' && API_KEY) {
       try {
+        const { FormData } = await import('form-data');
         const formData = new FormData();
-        const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
-        formData.append('video', blob, req.file.originalname);
+        formData.append('video', req.file.buffer, { filename: req.file.originalname, contentType: req.file.mimetype });
         formData.append('style', style);
         formData.append('duration', duration.toString());
         formData.append('addMusic', addMusic);
@@ -206,6 +206,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+app.use('/api', (req, res) => {
+  res.status(404).json({ success: false, message: 'API endpoint not found' });
+});
+
 app.use((error, req, res, next) => {
   console.error('Server Error:', error);
   res.status(500).json({
@@ -246,30 +250,26 @@ function simulateLocalProcessing(taskId, file, modelType) {
 
   const steps = baseSteps.slice(0, config.steps + 1);
 
-  let currentIndex = 0;
+    let currentIndex = 0;
 
-  const executeStep = () => {
-    if (currentIndex >= steps.length) {
-      const task = taskStore.get(taskId);
-      if (task) {
-        task.status = 'completed';
-        task.progress = 100;
-        task.currentStep = '处理完成';
-        try {
-          task.videoUrl = URL.createObjectURL(new Blob([file.buffer], { type: file.mimetype }));
-        } catch (e) {
+    const executeStep = () => {
+      if (currentIndex >= steps.length) {
+        const task = taskStore.get(taskId);
+        if (task) {
+          task.status = 'completed';
+          task.progress = 100;
+          task.currentStep = '处理完成';
           task.videoUrl = null;
         }
+        return;
       }
-      return;
-    }
 
-    const step = steps[currentIndex];
-    const task = taskStore.get(taskId);
-    if (task) {
-      task.progress = step.progress;
-      task.currentStep = step.step;
-    }
+      const step = steps[currentIndex];
+      const task = taskStore.get(taskId);
+      if (task) {
+        task.progress = step.progress;
+        task.currentStep = step.step;
+      }
 
     currentIndex++;
     setTimeout(executeStep, step.delay);
