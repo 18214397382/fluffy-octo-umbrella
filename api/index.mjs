@@ -46,10 +46,17 @@ const UPYUN_PASSWORD = process.env.UPYUN_PASSWORD || 'dMK698SWzvvEt888PwuUPoEgRe
 const UPYUN_BUCKET = process.env.UPYUN_BUCKET || 'ai-video-uploads';
 const UPYUN_ENDPOINT = `https://${UPYUN_BUCKET}.on.upyun.com`;
 
+import COS from 'cos-nodejs-sdk-v5';
+
 const TENCENT_SECRET_ID = process.env.TENCENT_SECRET_ID || 'AKIDOccNtABk5B2dy5xay6zgbIjvreEZsBIC';
 const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY || 'jEVcY4NTJwMdiZKtDJAoDNJ0TiiTyEF1';
 const TENCENT_COS_BUCKET = process.env.TENCENT_COS_BUCKET || 'ai-video-uploads-1330620623-1325485155';
 const TENCENT_COS_REGION = process.env.TENCENT_COS_REGION || 'ap-guangzhou';
+
+const COS_CLIENT = new COS({
+  SecretId: TENCENT_SECRET_ID,
+  SecretKey: TENCENT_SECRET_KEY,
+});
 
 app.use('/api/ai-edit/start', (req, res, next) => {
   req.setTimeout(600000);
@@ -461,68 +468,32 @@ app.post('/api/cos/upload', upload.single('video'), async (req, res) => {
 
     const fileName = req.body.fileName || req.file.originalname;
     const saveKey = `uploads/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-    const cosHost = `${TENCENT_COS_BUCKET}.cos.${TENCENT_COS_REGION}.myqcloud.com`;
-    const fileUrl = `https://${cosHost}/${saveKey}`;
+    const fileUrl = `https://${TENCENT_COS_BUCKET}.cos.${TENCENT_COS_REGION}.myqcloud.com/${saveKey}`;
 
-    console.log(`[COS Upload] Starting upload: ${saveKey} (${(req.file.size / 1024 / 1024).toFixed(1)}MB)`);
+    console.log(`[COS SDK] Uploading ${saveKey} (${(req.file.size / 1024 / 1024).toFixed(1)}MB)`);
 
-    const now = Math.floor(Date.now() / 1000);
-    const keyTime = `${now - 3600};${now + 3600}`;
-    const signKey = crypto.createHmac('sha1', TENCENT_SECRET_KEY).update(keyTime).digest('hex');
-    const httpString = `put\n/${saveKey}\n\n\n`;
-    const sha1edHttpString = crypto.createHash('sha1').update(httpString).digest('hex');
-    const stringToSign = `sha1\n${keyTime}\n${sha1edHttpString}\n`;
-    const signature = crypto.createHmac('sha1', signKey).update(stringToSign).digest('hex');
-    const authorization = `q-sign-algorithm=sha1&q-ak=${TENCENT_SECRET_ID}&q-sign-time=${keyTime}&q-key-time=${keyTime}&q-header-list=&q-url-param-list=&q-signature=${signature}`;
-
-    await new Promise((resolve, reject) => {
-      const url = new URL(`https://${cosHost}/${saveKey}`);
-      const options = {
-        hostname: url.hostname,
-        port: 443,
-        path: url.pathname,
-        method: 'PUT',
-        headers: {
-          'Authorization': authorization,
-          'Content-Type': 'video/mp4',
-          'Content-Length': req.file.size,
-        },
-        timeout: 600000,
-      };
-
-      const cosReq = https.request(options, (cosRes) => {
-        let data = '';
-        cosRes.on('data', chunk => data += chunk);
-        cosRes.on('end', () => {
-          console.log(`[COS Upload] Response: ${cosRes.statusCode}`);
-          if (cosRes.statusCode >= 200 && cosRes.statusCode < 300) {
-            resolve();
-          } else {
-            reject(new Error(`COS upload failed: ${cosRes.statusCode} ${data}`));
-          }
-        });
-      });
-
-      cosReq.on('error', reject);
-      cosReq.on('timeout', () => {
-        cosReq.destroy();
-        reject(new Error('COS upload timeout'));
-      });
-
-      cosReq.write(req.file.buffer);
-      cosReq.end();
+    const result = await COS_CLIENT.putObject({
+      Bucket: TENCENT_COS_BUCKET,
+      Region: TENCENT_COS_REGION,
+      Key: saveKey,
+      Body: req.file.buffer,
+      ContentLength: req.file.size,
+      ContentType: req.file.mimetype || 'video/mp4',
     });
 
-    console.log(`[COS Upload] Success: ${fileUrl}`);
+    console.log(`[COS SDK] Success:`, result.statusCode);
     res.status(200).json({
       success: true,
       fileUrl,
       saveKey,
-      message: '上传成功',
+      message: '上传到腾讯云成功',
     });
   } catch (e) {
-    console.error('[COS Upload] Error:', e);
-    res.status(500).json({ success: false, message: e.message || '上传失败' });
+    console.error('[COS SDK] Error:', e.code || e.message);
+    const msg = e.code === 'NetworkingError'
+      ? '腾讯云网络连接失败，请检查网络或配置'
+      : `腾讯云上传失败: ${e.code || e.message}`;
+    res.status(500).json({ success: false, message: msg });
   }
 });
 
