@@ -7,6 +7,7 @@ import multer from 'multer';
 import https from 'https';
 import http from 'http';
 import crypto from 'crypto';
+import querystring from 'querystring';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,6 +45,11 @@ const UPYUN_OPERATOR = process.env.UPYUN_OPERATOR || 'aiyun';
 const UPYUN_PASSWORD = process.env.UPYUN_PASSWORD || 'dMK698SWzvvEt888PwuUPoEgReMbvrC9';
 const UPYUN_BUCKET = process.env.UPYUN_BUCKET || 'ai-video-uploads';
 const UPYUN_ENDPOINT = `https://${UPYUN_BUCKET}.on.upyun.com`;
+
+const TENCENT_SECRET_ID = process.env.TENCENT_SECRET_ID || '';
+const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY || '';
+const TENCENT_COS_BUCKET = process.env.TENCENT_COS_BUCKET || '';
+const TENCENT_COS_REGION = process.env.TENCENT_COS_REGION || 'ap-guangzhou';
 
 app.use('/api/ai-edit/start', (req, res, next) => {
   req.setTimeout(600000);
@@ -176,7 +182,7 @@ function parseBaiduPanUrl(url) {
 
 app.post('/api/ai-edit/start-url', async (req, res) => {
   try {
-    let { videoUrl, style = 'trending', duration = 30, modelType = 'local-basic', modelProvider = 'local' } = req.body;
+    let { videoUrl, style = 'trending', duration = 30, modelType = 'local-basic', modelProvider = 'local', cosSaveKey } = req.body;
 
     if (!videoUrl) {
       res.status(400).json({ success: false, message: '视频URL是必需的' });
@@ -197,6 +203,7 @@ app.post('/api/ai-edit/start-url', async (req, res) => {
       modelType,
       modelProvider,
       videoUrl,
+      cosSaveKey,
       style,
       duration: parseInt(duration),
       addMusic: 'true',
@@ -401,6 +408,67 @@ app.post('/api/github-release/start', express.json(), async (req, res) => {
   } catch (error) {
     console.error('获取 GitHub Release 失败:', error);
     res.status(500).json({ success: false, message: '获取失败: ' + error.message });
+  }
+});
+
+function getCosAuthorization(method, pathname, params) {
+  const now = Math.floor(Date.now() / 1000);
+  const keyTime = `${now - 3600};${now + 3600}`;
+  const signKey = crypto.createHmac('sha1', TENCENT_SECRET_KEY).update(keyTime).digest('hex');
+
+  const httpString = `${method.toLowerCase()}\n${pathname}\n${params || ''}\n\n`;
+  const sha1edHttpString = crypto.createHash('sha1').update(httpString).digest('hex');
+  const stringToSign = `sha1\n${keyTime}\n${sha1edHttpString}\n`;
+
+  const signature = crypto.createHmac('sha1', signKey).update(stringToSign).digest('hex');
+
+  return {
+    authorization: `q-sign-algorithm=sha1&q-ak=${TENCENT_SECRET_ID}&q-sign-time=${keyTime}&q-key-time=${keyTime}&q-header-list=&q-url-param-list=&q-signature=${signature}`,
+    keyTime,
+  };
+}
+
+app.post('/api/cos/policy', express.json(), (req, res) => {
+  const { fileName, fileSize } = req.body;
+  if (!fileName) {
+    res.status(400).json({ success: false, message: 'fileName is required' });
+    return;
+  }
+
+  if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY || !TENCENT_COS_BUCKET) {
+    res.status(400).json({ success: false, message: '腾讯云 COS 未配置' });
+    return;
+  }
+
+  const saveKey = `uploads/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+
+  const cosHost = `${TENCENT_COS_BUCKET}.cos.${TENCENT_COS_REGION}.myqcloud.com`;
+  const uploadUrl = `https://${cosHost}/`;
+
+  res.status(200).json({
+    success: true,
+    uploadUrl,
+    saveKey,
+    cosHost,
+    secretId: TENCENT_SECRET_ID,
+    secretKey: TENCENT_SECRET_KEY,
+    bucket: TENCENT_COS_BUCKET,
+    region: TENCENT_COS_REGION,
+    fileUrl: `https://${cosHost}/${saveKey}`,
+  });
+});
+
+app.post('/api/cos/delete', express.json(), async (req, res) => {
+  const { saveKey } = req.body;
+  if (!saveKey) {
+    res.status(400).json({ success: false, message: 'saveKey is required' });
+    return;
+  }
+  try {
+    await deleteCosFile(saveKey);
+    res.status(200).json({ success: true, message: '文件已删除' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
   }
 });
 
@@ -767,6 +835,54 @@ function processUrlTask(taskId) {
   });
 }
 
+function deleteCosFile(saveKey) {
+  return new Promise((resolve) => {
+    if (!saveKey || !saveKey.startsWith('/')) {
+      resolve();
+      return;
+    }
+
+    const cleanKey = saveKey.startsWith('/') ? saveKey : '/' + saveKey;
+    const pathname = cleanKey;
+    const method = 'DELETE';
+
+    const now = Math.floor(Date.now() / 1000);
+    const keyTime = `${now - 3600};${now + 3600}`;
+    const signKey = crypto.createHmac('sha1', TENCENT_SECRET_KEY).update(keyTime).digest('hex');
+    const httpString = `${method.toLowerCase()}\n${pathname}\n\n\n`;
+    const sha1edHttpString = crypto.createHash('sha1').update(httpString).digest('hex');
+    const stringToSign = `sha1\n${keyTime}\n${sha1edHttpString}\n`;
+    const signature = crypto.createHmac('sha1', signKey).update(stringToSign).digest('hex');
+    const authorization = `q-sign-algorithm=sha1&q-ak=${TENCENT_SECRET_ID}&q-sign-time=${keyTime}&q-key-time=${keyTime}&q-header-list=&q-url-param-list=&q-signature=${signature}`;
+
+    const cosHost = `${TENCENT_COS_BUCKET}.cos.${TENCENT_COS_REGION}.myqcloud.com`;
+    const options = {
+      hostname: cosHost,
+      path: pathname,
+      method: 'DELETE',
+      headers: { Authorization: authorization },
+    };
+
+    const req = https.request(options, (resp) => {
+      let data = '';
+      resp.on('data', (chunk) => data += chunk);
+      resp.on('end', () => {
+        if (resp.statusCode === 204 || resp.statusCode === 200) {
+          console.log(`COS 文件已删除: ${saveKey}`);
+        } else {
+          console.warn(`COS 删除失败 (${resp.statusCode}): ${data}`);
+        }
+        resolve();
+      });
+    });
+    req.on('error', (e) => {
+      console.error('COS 删除错误:', e.message);
+      resolve();
+    });
+    req.end();
+  });
+}
+
 function simulateLocalProcessing(taskId, modelType) {
   const modelConfig = {
     'local-basic': { steps: 5, speed: 1, quality: '标准' },
@@ -801,6 +917,9 @@ function simulateLocalProcessing(taskId, modelType) {
           task.progress = 100;
           task.currentStep = '处理完成';
           task.videoUrl = null;
+          if (task.cosSaveKey) {
+            deleteCosFile(task.cosSaveKey);
+          }
         }
         return;
       }
