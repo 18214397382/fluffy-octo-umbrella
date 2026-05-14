@@ -389,8 +389,13 @@ async function startEdit() {
   document.getElementById('resultVideo').classList.remove('show');
 
   if (inputMode === 'url') {
-    const url = document.getElementById('videoUrl').value.trim();
+    let url = document.getElementById('videoUrl').value.trim();
     if (!url) { showError('请输入视频链接'); return; }
+    
+    if (url.includes('pan.baidu.com')) {
+      document.getElementById('statusText').textContent = '检测到百度网盘链接，正在处理...';
+      url = url.replace(/shareid=\d+/, '').replace(/\?.*/, '');
+    }
     try {
       const res = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
         method: 'POST',

@@ -163,13 +163,28 @@ app.get('/api/temp/:taskId', async (req, res) => {
   }
 });
 
+function parseBaiduPanUrl(url) {
+  if (!url.includes('pan.baidu.com')) return url;
+  
+  const match = url.match(/\/s\/([a-zA-Z0-9_-]+)/);
+  if (match) {
+    const shareId = match[1];
+    return `https://pan.baidu.com/share/link?shareid=&uk=&third=0&adapt=pc&fr=ftw&surl=${shareId}`;
+  }
+  return url;
+}
+
 app.post('/api/ai-edit/start-url', async (req, res) => {
   try {
-    const { videoUrl, style = 'trending', duration = 30, modelType = 'local-basic', modelProvider = 'local' } = req.body;
+    let { videoUrl, style = 'trending', duration = 30, modelType = 'local-basic', modelProvider = 'local' } = req.body;
 
     if (!videoUrl) {
       res.status(400).json({ success: false, message: '视频URL是必需的' });
       return;
+    }
+
+    if (videoUrl.includes('pan.baidu.com')) {
+      videoUrl = parseBaiduPanUrl(videoUrl);
     }
 
     const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
