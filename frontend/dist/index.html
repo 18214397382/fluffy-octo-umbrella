@@ -394,7 +394,24 @@ async function startCosUpload() {
             if (startData.success) startPolling(startData.taskId);
             else showError(startData.message || '启动失败');
           } else {
-            showError(data.message || '上传失败');
+            const errorMsg = data.message || '上传失败';
+            if (errorMsg.includes('NoSuchBucket') || errorMsg.includes('bucket') || errorMsg.includes('Bucket')) {
+              showError(`
+                <div style="text-align:left;font-size:13px;margin-top:8px">
+                <strong>⚠️ 腾讯云存储桶未配置</strong><br><br>
+                <strong>原因：</strong>腾讯云 COS 存储桶不存在<br><br>
+                <strong>解决方案（选择一个）：</strong><br>
+                • <strong>方案1（推荐）：</strong>使用"📁 本地上传"方式，无需配置<br>
+                • <strong>方案2：</strong>去腾讯云控制台创建存储桶<br>
+                &nbsp;&nbsp;- 访问：https://console.cloud.tencent.com/cos<br>
+                &nbsp;&nbsp;- 创建桶名：<code>ai-video-uploads-1330620623</code><br>
+                &nbsp;&nbsp;- 地区：广州 (ap-guangzhou)<br><br>
+                <em>建议先使用本地上传，简单快速！</em>
+                </div>
+              `);
+            } else {
+              showError(`上传失败: ${errorMsg}`);
+            }
           }
         } catch (e) {
           showError('响应解析错误');
