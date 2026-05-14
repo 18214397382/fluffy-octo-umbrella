@@ -695,8 +695,25 @@ app.get('/', (req, res) => {
   }
 });
 
-app.use('/api', (req, res) => {
-  res.status(404).json({ success: false, message: 'API endpoint not found' });
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/')) {
+    res.status(404).json({ success: false, message: 'API endpoint not found' });
+    return;
+  }
+  const filePath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(200).send(`
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>AI Video Editor</title></head>
+<body style="font-family:sans-serif;padding:40px;background:#1a1a2e;color:#fff">
+<h1>🚀 AI 视频剪辑工具</h1>
+<p>服务器正在运行</p>
+<p><a href="/api/health" style="color:#4fc3f7">检查服务状态</a></p>
+</body></html>
+    `);
+  }
 });
 
 app.use((error, req, res, next) => {
