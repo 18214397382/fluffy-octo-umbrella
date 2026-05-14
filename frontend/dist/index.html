@@ -327,13 +327,10 @@ async function startCosUpload() {
     return;
   }
 
-  const progressContainer = document.getElementById('progressContainer');
   const progressFill = document.getElementById('progressFill');
   const statusText = document.getElementById('statusText');
-  const resultContainer = document.getElementById('resultContainer');
 
-  progressContainer.style.display = 'block';
-  resultContainer.style.display = 'none';
+  document.getElementById('statusCard').classList.add('show');
   progressFill.style.width = '2%';
   statusText.textContent = '正在获取上传地址...';
 
