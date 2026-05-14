@@ -322,6 +322,11 @@ async function startCosUpload() {
   const file = fileInput.files[0];
   if (!file) { showError('请先选择视频文件'); return; }
 
+  if (typeof CryptoJS === 'undefined') {
+    showError('CryptoJS 加载失败，请刷新页面重试');
+    return;
+  }
+
   const progressContainer = document.getElementById('progressContainer');
   const progressFill = document.getElementById('progressFill');
   const statusText = document.getElementById('statusText');
@@ -338,8 +343,17 @@ async function startCosUpload() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fileName: file.name, fileSize: file.size }),
     });
+    
+    if (!policyRes.ok) {
+      showError('获取上传地址失败: ' + policyRes.status);
+      return;
+    }
+    
     const policyData = await policyRes.json();
-    if (!policyData.success) { showError('获取上传地址失败'); return; }
+    if (!policyData.success) { 
+      showError('获取上传地址失败: ' + (policyData.message || '未知错误')); 
+      return; 
+    }
 
     statusText.textContent = '正在上传到腾讯云 COS...';
 
@@ -382,16 +396,28 @@ async function startCosUpload() {
             cosSaveKey: policyData.saveKey,
           }),
         });
+        
+        if (!startRes.ok) {
+          showError('启动AI处理失败: ' + startRes.status);
+          return;
+        }
+        
         const startData = await startRes.json();
         if (startData.success) startPolling(startData.taskId);
         else showError(startData.message || '启动失败');
       } else {
-        showError('上传失败: ' + xhr.status);
+        showError('上传失败: ' + xhr.status + ' ' + xhr.responseText);
       }
     };
+    
+    xhr.ontimeout = () => showError('上传超时，请重试');
     xhr.onerror = () => showError('网络错误，请重试');
+    xhr.timeout = 300000;
     xhr.send(file);
-  } catch (e) { showError('上传错误: ' + e.message); }
+  } catch (e) { 
+    console.error('COS上传错误:', e);
+    showError('上传错误: ' + e.message); 
+  }
 }
 
 let compressedFile = null;
