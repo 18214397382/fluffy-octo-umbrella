@@ -771,6 +771,135 @@ async function uploadSingleFile(file) {
   } catch (e) { showError('上传错误: ' + e.message); }
 }
 
+async function startCosUpload() {
+  const fileInput = document.getElementById('cosFileInput');
+  const file = fileInput.files[0];
+  if (!file) { showError('请先选择视频文件'); return; }
+
+  if (typeof CryptoJS === 'undefined') {
+    showError('CryptoJS 加载失败，请刷新页面重试');
+    return;
+  }
+
+  document.getElementById('statusCard').classList.add('show');
+  const progressFill = document.getElementById('progressFill');
+  const statusText = document.getElementById('statusText');
+
+  progressFill.style.width = '2%';
+  statusText.textContent = '正在获取上传地址...';
+  statusText.className = 'status-text processing';
+
+  try {
+    const policyRes = await fetch(`${API_BASE}/api/cos/policy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName: file.name, fileSize: file.size }),
+    });
+
+    if (!policyRes.ok) {
+      showError('获取上传地址失败: HTTP ' + policyRes.status);
+      return;
+    }
+
+    const policyData = await policyRes.json();
+    console.log('COS Policy:', policyData);
+
+    if (!policyData.success) {
+      showError('获取上传地址失败: ' + (policyData.message || '未知错误'));
+      return;
+    }
+
+    progressFill.style.width = '5%';
+    statusText.textContent = '正在上传到腾讯云 COS...';
+
+    const now = Math.floor(Date.now() / 1000);
+    const keyTime = `${now - 3600};${now + 3600}`;
+    const signKey = CryptoJS.HmacSHA1(keyTime, policyData.secretKey).toString(CryptoJS.enc.Hex);
+    const httpString = `put\n/${policyData.saveKey}\n\n\n`;
+    const sha1edHttpString = CryptoJS.SHA1(httpString).toString(CryptoJS.enc.Hex);
+    const stringToSign = `sha1\n${keyTime}\n${sha1edHttpString}\n`;
+    const signature = CryptoJS.HmacSHA1(stringToSign, signKey).toString(CryptoJS.enc.Hex);
+    const authorization = `q-sign-algorithm=sha1&q-ak=${policyData.secretId}&q-sign-time=${keyTime}&q-key-time=${keyTime}&q-header-list=&q-url-param-list=&q-signature=${signature}`;
+
+    console.log('Uploading to:', `https://${policyData.cosHost}/${policyData.saveKey}`);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', `https://${policyData.cosHost}/${policyData.saveKey}`, true);
+    xhr.setRequestHeader('Authorization', authorization);
+    xhr.setRequestHeader('Content-Type', 'video/mp4');
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = 5 + Math.round((e.loaded / e.total) * 50);
+        progressFill.style.width = pct + '%';
+        statusText.textContent = `上传中 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
+      }
+    };
+
+    xhr.onload = async () => {
+      console.log('Upload response:', xhr.status, xhr.statusText);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        progressFill.style.width = '60%';
+        statusText.textContent = '上传完成，启动AI处理...';
+
+        try {
+          const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              videoUrl: policyData.fileUrl,
+              style: selectedStyle,
+              duration: document.getElementById('duration').value || '30',
+              modelType: selectedModel,
+              modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
+              cosSaveKey: policyData.saveKey,
+            }),
+          });
+
+          console.log('Start AI response:', startRes.status);
+
+          if (!startRes.ok) {
+            showError('启动AI处理失败: HTTP ' + startRes.status);
+            return;
+          }
+
+          const startData = await startRes.json();
+          console.log('Start AI data:', startData);
+
+          if (startData.success) {
+            startPolling(startData.taskId);
+          } else {
+            showError(startData.message || '启动AI处理失败');
+          }
+        } catch (e) {
+          console.error('Start AI error:', e);
+          showError('启动AI处理错误: ' + e.message);
+        }
+      } else {
+        console.error('Upload failed:', xhr.status, xhr.responseText);
+        showError('腾讯云上传失败: HTTP ' + xhr.status);
+      }
+    };
+
+    xhr.ontimeout = () => {
+      console.error('Upload timeout');
+      showError('上传超时（5分钟），请检查网络后重试');
+    };
+
+    xhr.onerror = () => {
+      console.error('Upload error');
+      showError('网络错误，请检查网络连接后重试');
+    };
+
+    xhr.timeout = 300000;
+    xhr.send(file);
+
+  } catch (e) {
+    console.error('COS upload error:', e);
+    showError('上传过程出错: ' + e.message);
+  }
+}
+
 function startPolling(taskId) {
   if (pollingTimer) clearInterval(pollingTimer);
   pollingTimer = setInterval(async () => {
