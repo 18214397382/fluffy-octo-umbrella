@@ -453,6 +453,79 @@ app.post('/api/cos/policy', express.json(), (req, res) => {
   });
 });
 
+app.post('/api/cos/upload', upload.single('video'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: '视频文件是必需的' });
+    }
+
+    const fileName = req.body.fileName || req.file.originalname;
+    const saveKey = `uploads/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+    const cosHost = `${TENCENT_COS_BUCKET}.cos.${TENCENT_COS_REGION}.myqcloud.com`;
+    const fileUrl = `https://${cosHost}/${saveKey}`;
+
+    console.log(`[COS Upload] Starting upload: ${saveKey} (${(req.file.size / 1024 / 1024).toFixed(1)}MB)`);
+
+    const now = Math.floor(Date.now() / 1000);
+    const keyTime = `${now - 3600};${now + 3600}`;
+    const signKey = crypto.createHmac('sha1', TENCENT_SECRET_KEY).update(keyTime).digest('hex');
+    const httpString = `put\n/${saveKey}\n\n\n`;
+    const sha1edHttpString = crypto.createHash('sha1').update(httpString).digest('hex');
+    const stringToSign = `sha1\n${keyTime}\n${sha1edHttpString}\n`;
+    const signature = crypto.createHmac('sha1', signKey).update(stringToSign).digest('hex');
+    const authorization = `q-sign-algorithm=sha1&q-ak=${TENCENT_SECRET_ID}&q-sign-time=${keyTime}&q-key-time=${keyTime}&q-header-list=&q-url-param-list=&q-signature=${signature}`;
+
+    await new Promise((resolve, reject) => {
+      const url = new URL(`https://${cosHost}/${saveKey}`);
+      const options = {
+        hostname: url.hostname,
+        port: 443,
+        path: url.pathname,
+        method: 'PUT',
+        headers: {
+          'Authorization': authorization,
+          'Content-Type': 'video/mp4',
+          'Content-Length': req.file.size,
+        },
+        timeout: 600000,
+      };
+
+      const cosReq = https.request(options, (cosRes) => {
+        let data = '';
+        cosRes.on('data', chunk => data += chunk);
+        cosRes.on('end', () => {
+          console.log(`[COS Upload] Response: ${cosRes.statusCode}`);
+          if (cosRes.statusCode >= 200 && cosRes.statusCode < 300) {
+            resolve();
+          } else {
+            reject(new Error(`COS upload failed: ${cosRes.statusCode} ${data}`));
+          }
+        });
+      });
+
+      cosReq.on('error', reject);
+      cosReq.on('timeout', () => {
+        cosReq.destroy();
+        reject(new Error('COS upload timeout'));
+      });
+
+      cosReq.write(req.file.buffer);
+      cosReq.end();
+    });
+
+    console.log(`[COS Upload] Success: ${fileUrl}`);
+    res.status(200).json({
+      success: true,
+      fileUrl,
+      saveKey,
+      message: '上传成功',
+    });
+  } catch (e) {
+    console.error('[COS Upload] Error:', e);
+    res.status(500).json({ success: false, message: e.message || '上传失败' });
+  }
+});
+
 app.post('/api/cos/delete', express.json(), async (req, res) => {
   const { saveKey } = req.body;
   if (!saveKey) {

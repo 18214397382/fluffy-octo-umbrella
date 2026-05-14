@@ -332,41 +332,16 @@ async function startCosUpload() {
 
   document.getElementById('statusCard').classList.add('show');
   progressFill.style.width = '2%';
-  statusText.textContent = '正在获取上传地址...';
+  statusText.textContent = '正在上传到服务器...';
 
   try {
-    const policyRes = await fetch(`${API_BASE}/api/cos/policy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName: file.name, fileSize: file.size }),
-    });
-    
-    if (!policyRes.ok) {
-      showError('获取上传地址失败: ' + policyRes.status);
-      return;
-    }
-    
-    const policyData = await policyRes.json();
-    if (!policyData.success) { 
-      showError('获取上传地址失败: ' + (policyData.message || '未知错误')); 
-      return; 
-    }
-
-    statusText.textContent = '正在上传到腾讯云 COS...';
-
-    const now = Math.floor(Date.now() / 1000);
-    const keyTime = `${now - 3600};${now + 3600}`;
-    const signKey = CryptoJS.HmacSHA1(keyTime, policyData.secretKey).toString(CryptoJS.enc.Hex);
-    const httpString = `put\n/${policyData.saveKey}\n\n\n`;
-    const sha1edHttpString = CryptoJS.SHA1(httpString).toString(CryptoJS.enc.Hex);
-    const stringToSign = `sha1\n${keyTime}\n${sha1edHttpString}\n`;
-    const signature = CryptoJS.HmacSHA1(stringToSign, signKey).toString(CryptoJS.enc.Hex);
-    const authorization = `q-sign-algorithm=sha1&q-ak=${policyData.secretId}&q-sign-time=${keyTime}&q-key-time=${keyTime}&q-header-list=&q-url-param-list=&q-signature=${signature}`;
+    const formData = new FormData();
+    formData.append('video', file);
+    formData.append('fileName', file.name);
 
     const xhr = new XMLHttpRequest();
-    xhr.open('PUT', `https://${policyData.cosHost}/${policyData.saveKey}`, true);
-    xhr.setRequestHeader('Authorization', authorization);
-    xhr.setRequestHeader('Content-Type', 'video/mp4');
+    xhr.open('POST', `${API_BASE}/api/cos/upload`, true);
+    xhr.timeout = 600000;
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
@@ -377,43 +352,47 @@ async function startCosUpload() {
     };
 
     xhr.onload = async () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        progressFill.style.width = '60%';
-        statusText.textContent = '上传完成，启动AI处理...';
+      console.log('COS Upload response:', xhr.status, xhr.responseText);
+      if (xhr.status === 200) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.success) {
+            progressFill.style.width = '60%';
+            statusText.textContent = '上传完成，启动AI处理...';
 
-        const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            videoUrl: policyData.fileUrl,
-            style: selectedStyle,
-            duration: document.getElementById('duration').value || '30',
-            modelType: selectedModel,
-            modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
-            cosSaveKey: policyData.saveKey,
-          }),
-        });
-        
-        if (!startRes.ok) {
-          showError('启动AI处理失败: ' + startRes.status);
-          return;
+            const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                videoUrl: data.fileUrl,
+                style: selectedStyle,
+                duration: document.getElementById('duration').value || '30',
+                modelType: selectedModel,
+                modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
+                cosSaveKey: data.saveKey,
+              }),
+            });
+
+            const startData = await startRes.json();
+            if (startData.success) startPolling(startData.taskId);
+            else showError(startData.message || '启动失败');
+          } else {
+            showError(data.message || '上传失败');
+          }
+        } catch (e) {
+          showError('响应解析错误');
         }
-        
-        const startData = await startRes.json();
-        if (startData.success) startPolling(startData.taskId);
-        else showError(startData.message || '启动失败');
       } else {
-        showError('上传失败: ' + xhr.status + ' ' + xhr.responseText);
+        showError('上传失败: HTTP ' + xhr.status);
       }
     };
-    
-    xhr.ontimeout = () => showError('上传超时，请重试');
-    xhr.onerror = () => showError('网络错误，请重试');
-    xhr.timeout = 300000;
-    xhr.send(file);
-  } catch (e) { 
-    console.error('COS上传错误:', e);
-    showError('上传错误: ' + e.message); 
+
+    xhr.ontimeout = () => showError('上传超时（10分钟），请尝试更小的视频文件');
+    xhr.onerror = () => showError('网络错误，请检查网络后重试');
+    xhr.send(formData);
+  } catch (e) {
+    console.error('COS upload error:', e);
+    showError('上传错误: ' + e.message);
   }
 }
 
