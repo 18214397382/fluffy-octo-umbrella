@@ -48,7 +48,7 @@ const UPYUN_ENDPOINT = `https://${UPYUN_BUCKET}.on.upyun.com`;
 
 const TENCENT_SECRET_ID = process.env.TENCENT_SECRET_ID || 'AKIDOccNtABk5B2dy5xay6zgbIjvreEZsBIC';
 const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY || 'jEVcY4NTJwMdiZKtDJAoDNJ0TiiTyEF1';
-const TENCENT_COS_BUCKET = process.env.TENCENT_COS_BUCKET || 'ai-video-uploads-1330620623';
+const TENCENT_COS_BUCKET = process.env.TENCENT_COS_BUCKET || 'ai-video-uploads-1330620623-1325485155';
 const TENCENT_COS_REGION = process.env.TENCENT_COS_REGION || 'ap-guangzhou';
 
 app.use('/api/ai-edit/start', (req, res, next) => {

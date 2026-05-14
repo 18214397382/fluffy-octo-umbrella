@@ -91,7 +91,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
       <button class="model-tag active" id="tabUpload" onclick="switchTab('upload')">📁 本地上传</button>
       <button class="model-tag" id="tabUrl" onclick="switchTab('url')">🔗 视频链接</button>
-      <button class="model-tag" id="tabCos" onclick="switchTab('cos')">☁️ 云端上传</button>
+      <button class="model-tag" id="tabCos" onclick="switchTab('cos')">☁️ 腾讯云上传</button>
       <button class="model-tag" id="tabGithub" onclick="switchTab('github')">🐙 GitHub Release</button>
     </div>
     <div id="uploadSection">
@@ -134,14 +134,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
     <div id="cosSection" style="display:none">
       <div style="background:rgba(255,255,255,0.03);padding:16px;border-radius:8px;margin-bottom:12px">
-        <div style="color:#888;font-size:14px;margin-bottom:8px">☁️ 云端服务器上传</div>
+        <div style="color:#888;font-size:14px;margin-bottom:8px">☁️ 腾讯云 COS 上传</div>
         <div style="color:#aaa;font-size:13px;line-height:1.8">
-          直接上传到云端服务器处理，关机后也能用，稳定可靠
+          上传到腾讯云对象存储，稳定可靠，关机后也能用
         </div>
       </div>
       <div class="upload-zone" id="cosUploadZone" onclick="document.getElementById('cosFileInput').click()">
         <div class="upload-icon">☁️</div>
-        <div class="upload-text">点击选择视频上传到云端</div>
+        <div class="upload-text">点击选择视频上传到腾讯云</div>
         <div class="upload-hint">支持 MP4 / MOV / AVI，最大 1GB，自动AI剪辑</div>
       </div>
       <input type="file" id="cosFileInput" accept="video/*" style="display:none">
@@ -150,7 +150,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <span class="name" id="cosFileName"></span>
         <span class="size" id="cosFileSize"></span>
       </div>
-      <button id="cosUploadBtn" class="btn-primary" style="width:100%;margin-top:12px" onclick="startCosUpload()" disabled>☁️ 上传到云端并开始剪辑</button>
+      <button id="cosUploadBtn" class="btn-primary" style="width:100%;margin-top:12px" onclick="startCosUpload()" disabled>☁️ 上传到腾讯云并开始剪辑</button>
     </div>
   </div>
 
@@ -332,35 +332,22 @@ async function startCosUpload() {
 
   document.getElementById('statusCard').classList.add('show');
   progressFill.style.width = '2%';
-  statusText.textContent = '正在连接服务器...';
+  statusText.textContent = '正在连接腾讯云...';
 
   try {
-    console.log('[Cloud Upload] File:', file.name, (file.size / 1024 / 1024).toFixed(1) + 'MB');
+    console.log('[Tencent Upload] File:', file.name, (file.size / 1024 / 1024).toFixed(1) + 'MB');
 
-    const healthRes = await fetch(`${API_BASE}/api/health`).catch(e => {
-      console.error('[Cloud Upload] Health check failed:', e);
-      return null;
-    });
-
-    if (!healthRes || !healthRes.ok) {
-      statusText.textContent = '服务器启动中，请稍候...';
-      await new Promise(r => setTimeout(r, 2000));
-    }
-
-    statusText.textContent = '正在上传到云端服务器...';
+    statusText.textContent = '正在上传到腾讯云COS...';
 
     const formData = new FormData();
     formData.append('video', file);
-    formData.append('style', selectedStyle);
-    formData.append('duration', document.getElementById('duration').value || '30');
-    formData.append('modelType', selectedModel);
-    formData.append('modelProvider', selectedModel.startsWith('cloud') ? 'cloud' : 'local');
+    formData.append('fileName', file.name);
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_BASE}/api/ai-edit/start`, true);
+    xhr.open('POST', `${API_BASE}/api/cos/upload`, true);
     xhr.timeout = 600000;
 
-    console.log('[Cloud Upload] Starting upload to:', `${API_BASE}/api/ai-edit/start`);
+    console.log('[Tencent Upload] Starting upload to Tencent Cloud COS...');
 
     let lastProgress = 0;
 
@@ -368,7 +355,7 @@ async function startCosUpload() {
       if (e.lengthComputable) {
         const pct = 5 + Math.round((e.loaded / e.total) * 50);
         progressFill.style.width = pct + '%';
-        statusText.textContent = `云端上传 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
+        statusText.textContent = `腾讯云上传 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
         lastProgress = pct;
       }
     };
@@ -377,22 +364,41 @@ async function startCosUpload() {
       if (lastProgress > 5 && lastProgress < 55) {
         statusText.textContent += '.';
         if (statusText.textContent.length > 50) {
-          statusText.textContent = '正在上传，请耐心等待...';
+          statusText.textContent = '正在上传到腾讯云，请耐心等待...';
         }
       }
     }, 3000);
 
     xhr.onload = async () => {
       clearInterval(keepAlive);
-      console.log('[Cloud Upload] Response:', xhr.status);
+      console.log('[Tencent Upload] Response:', xhr.status);
 
       if (xhr.status === 200) {
         try {
           const data = JSON.parse(xhr.responseText);
           if (data.success) {
             progressFill.style.width = '60%';
-            statusText.textContent = '✅ 上传完成，AI处理中...';
-            startPolling(data.taskId);
+            statusText.textContent = '✅ 上传完成，启动AI处理...';
+
+            const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                videoUrl: data.fileUrl,
+                style: selectedStyle,
+                duration: document.getElementById('duration').value || '30',
+                modelType: selectedModel,
+                modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
+                cosSaveKey: data.saveKey,
+              }),
+            });
+
+            const startData = await startRes.json();
+            if (startData.success) {
+              startPolling(startData.taskId);
+            } else {
+              showError(startData.message || '启动失败');
+            }
           } else {
             showError(data.message || '上传失败');
           }
@@ -400,7 +406,12 @@ async function startCosUpload() {
           showError('响应解析错误');
         }
       } else {
-        showError(`上传失败: HTTP ${xhr.status}`);
+        try {
+          const errData = JSON.parse(xhr.responseText);
+          showError(errData.message || `上传失败: HTTP ${xhr.status}`);
+        } catch(e) {
+          showError(`上传失败: HTTP ${xhr.status}`);
+        }
       }
     };
 
@@ -411,18 +422,18 @@ async function startCosUpload() {
 
     xhr.onerror = () => {
       clearInterval(keepAlive);
-      console.error('[Cloud Upload] Network error');
+      console.error('[Tencent Upload] Network error');
       showError(`
         <div style="text-align:left;font-size:13px;margin-top:8px">
         <strong>⚠️ 网络连接失败</strong><br><br>
         可能原因：<br>
         • 网络不稳定<br>
-        • 视频文件太大<br>
-        • 服务器暂时不可用<br><br>
+        • 腾讯云服务暂时不可用<br>
+        • 视频文件太大<br><br>
         <strong>建议：</strong><br>
         • 刷新页面重试<br>
         • 使用"📁 本地上传"方式<br>
-        • 尝试较小的视频文件<br>
+        • 尝试较小的视频文件（<100MB）<br>
         </div>
       `);
     };
