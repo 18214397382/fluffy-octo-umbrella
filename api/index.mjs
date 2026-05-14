@@ -46,9 +46,9 @@ const UPYUN_PASSWORD = process.env.UPYUN_PASSWORD || 'dMK698SWzvvEt888PwuUPoEgRe
 const UPYUN_BUCKET = process.env.UPYUN_BUCKET || 'ai-video-uploads';
 const UPYUN_ENDPOINT = `https://${UPYUN_BUCKET}.on.upyun.com`;
 
-const TENCENT_SECRET_ID = process.env.TENCENT_SECRET_ID || '';
-const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY || '';
-const TENCENT_COS_BUCKET = process.env.TENCENT_COS_BUCKET || '';
+const TENCENT_SECRET_ID = process.env.TENCENT_SECRET_ID || 'AKIDOccNtABk5B2dy5xay6zgbIjvreEZsBIC';
+const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY || 'jEVcY4NTJwMdiZKtDJAoDNJ0TiiTyEF1';
+const TENCENT_COS_BUCKET = process.env.TENCENT_COS_BUCKET || 'ai-video-uploads-1330620623';
 const TENCENT_COS_REGION = process.env.TENCENT_COS_REGION || 'ap-guangzhou';
 
 app.use('/api/ai-edit/start', (req, res, next) => {
@@ -432,11 +432,6 @@ app.post('/api/cos/policy', express.json(), (req, res) => {
   const { fileName, fileSize } = req.body;
   if (!fileName) {
     res.status(400).json({ success: false, message: 'fileName is required' });
-    return;
-  }
-
-  if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY || !TENCENT_COS_BUCKET) {
-    res.status(400).json({ success: false, message: '腾讯云 COS 未配置' });
     return;
   }
 
