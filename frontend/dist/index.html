@@ -332,9 +332,24 @@ async function startCosUpload() {
 
   document.getElementById('statusCard').classList.add('show');
   progressFill.style.width = '2%';
-  statusText.textContent = '正在上传到服务器...';
+  statusText.textContent = '正在连接服务器...';
 
   try {
+    console.log('[COS] API_BASE:', API_BASE);
+    console.log('[COS] File:', file.name, (file.size / 1024 / 1024).toFixed(1) + 'MB');
+
+    const healthRes = await fetch(`${API_BASE}/api/health`).catch(e => {
+      console.error('[COS] Health check failed:', e);
+      return null;
+    });
+
+    if (!healthRes || !healthRes.ok) {
+      statusText.textContent = '服务器启动中，请稍候...';
+      await new Promise(r => setTimeout(r, 3000));
+    }
+
+    statusText.textContent = '正在上传到服务器...';
+
     const formData = new FormData();
     formData.append('video', file);
     formData.append('fileName', file.name);
@@ -342,6 +357,8 @@ async function startCosUpload() {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${API_BASE}/api/cos/upload`, true);
     xhr.timeout = 600000;
+
+    console.log('[COS] Starting upload to:', `${API_BASE}/api/cos/upload`);
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
@@ -352,7 +369,7 @@ async function startCosUpload() {
     };
 
     xhr.onload = async () => {
-      console.log('COS Upload response:', xhr.status, xhr.responseText);
+      console.log('[COS] Response:', xhr.status, xhr.statusText, xhr.responseText.substring(0, 200));
       if (xhr.status === 200) {
         try {
           const data = JSON.parse(xhr.responseText);
@@ -383,12 +400,28 @@ async function startCosUpload() {
           showError('响应解析错误');
         }
       } else {
-        showError('上传失败: HTTP ' + xhr.status);
+        showError(`服务器返回错误: HTTP ${xhr.status}`);
       }
     };
 
-    xhr.ontimeout = () => showError('上传超时（10分钟），请尝试更小的视频文件');
-    xhr.onerror = () => showError('网络错误，请检查网络后重试');
+    xhr.ontimeout = () => {
+      console.error('[COS] Upload timeout after 10 minutes');
+      showError('上传超时（10分钟），请尝试更小的视频文件或检查网络');
+    };
+
+    xhr.onerror = (e) => {
+      console.error('[COS] Network error:', e);
+      const errorMsg = `
+        <div style="text-align:left;font-size:13px;margin-top:8px">
+        <strong>网络连接失败</strong><br>
+        • 检查你的网络连接<br>
+        • 刷新页面重试<br>
+        • 如果持续失败，请使用"本地上传"方式<br>
+        </div>
+      `;
+      showError(errorMsg);
+    };
+
     xhr.send(formData);
   } catch (e) {
     console.error('COS upload error:', e);
