@@ -1,1 +1,0 @@
-node -v && npm -v && npm ci --only=production && npm start
