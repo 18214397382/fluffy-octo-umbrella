@@ -728,7 +728,7 @@ async function processTask(taskId) {
     }
   }
 
-  const API_KEY = process.env.NVAPI_KEY || '';
+  const API_KEY = process.env.NVAPI_KEY || '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';
   const AI_API_BASE = process.env.AI_API_BASE || 'https://api.nvapi.io';
 
   if (modelProvider === 'cloud' && API_KEY && buffer) {
