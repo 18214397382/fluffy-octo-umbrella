@@ -345,17 +345,37 @@ async function startCosUpload() {
   try {
     console.log('[Tencent Upload] File:', file.name, (file.size / 1024 / 1024).toFixed(1) + 'MB');
 
+    statusText.textContent = '正在获取上传授权...';
+
+    const policyRes = await fetch(`${API_BASE}/api/cos/policy`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({fileName: file.name, fileSize: file.size}),
+    });
+
+    if (!policyRes.ok) {
+      showError(`获取授权失败: HTTP ${policyRes.status}`);
+      return;
+    }
+
+    const policyData = await policyRes.json();
+    console.log('[Tencent] Policy:', policyData);
+
+    if (!policyData.success) {
+      showError(policyData.message || '获取授权失败');
+      return;
+    }
+
     statusText.textContent = '正在上传到腾讯云COS...';
 
-    const formData = new FormData();
-    formData.append('video', file);
-    formData.append('fileName', file.name);
-
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_BASE}/api/cos/upload`, true);
+    xhr.open('PUT', policyData.uploadUrl + policyData.saveKey, true);
     xhr.timeout = 600000;
 
-    console.log('[Tencent Upload] Starting upload to Tencent Cloud COS...');
+    xhr.setRequestHeader('Authorization', policyData.authorization);
+    xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+
+    console.log('[Tencent] Direct upload to COS...');
 
     let lastProgress = 0;
 
@@ -379,47 +399,33 @@ async function startCosUpload() {
 
     xhr.onload = async () => {
       clearInterval(keepAlive);
-      console.log('[Tencent Upload] Response:', xhr.status);
+      console.log('[Tencent] Upload Response:', xhr.status);
 
-      if (xhr.status === 200) {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          if (data.success) {
-            progressFill.style.width = '60%';
-            statusText.textContent = '✅ 上传完成，启动AI处理...';
+      if (xhr.status >= 200 && xhr.status < 300) {
+        progressFill.style.width = '60%';
+        statusText.textContent = '✅ 上传完成，启动AI处理...';
 
-            const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                videoUrl: data.fileUrl,
-                style: selectedStyle,
-                duration: document.getElementById('duration').value || '30',
-                modelType: selectedModel,
-                modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
-                cosSaveKey: data.saveKey,
-              }),
-            });
+        const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoUrl: policyData.fileUrl,
+            style: selectedStyle,
+            duration: document.getElementById('duration').value || '30',
+            modelType: selectedModel,
+            modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
+            cosSaveKey: policyData.saveKey,
+          }),
+        });
 
-            const startData = await startRes.json();
-            if (startData.success) {
-              startPolling(startData.taskId);
-            } else {
-              showError(startData.message || '启动失败');
-            }
-          } else {
-            showError(data.message || '上传失败');
-          }
-        } catch (e) {
-          showError('响应解析错误');
+        const startData = await startRes.json();
+        if (startData.success) {
+          startPolling(startData.taskId);
+        } else {
+          showError(startData.message || '启动失败');
         }
       } else {
-        try {
-          const errData = JSON.parse(xhr.responseText);
-          showError(errData.message || `上传失败: HTTP ${xhr.status}`);
-        } catch(e) {
-          showError(`上传失败: HTTP ${xhr.status}`);
-        }
+        showError(`腾讯云上传失败: HTTP ${xhr.status}`);
       }
     };
 
@@ -430,23 +436,25 @@ async function startCosUpload() {
 
     xhr.onerror = () => {
       clearInterval(keepAlive);
-      console.error('[Tencent Upload] Network error');
+      console.error('[Tencent] Network error');
       showError(`
         <div style="text-align:left;font-size:13px;margin-top:8px">
-        <strong>⚠️ 网络连接失败</strong><br><br>
+        <strong>⚠️ 腾讯云直传失败</strong><br><br>
+        这是浏览器直接上传到腾讯云，不经过Railway服务器。<br><br>
         可能原因：<br>
-        • 网络不稳定<br>
-        • 腾讯云服务暂时不可用<br>
-        • 视频文件太大<br><br>
-        <strong>建议：</strong><br>
-        • 刷新页面重试<br>
-        • 使用"📁 本地上传"方式<br>
-        • 尝试较小的视频文件（<100MB）<br>
+        • 腾讯云CORS配置未开启（需要在腾讯云控制台配置）<br>
+        • 网络防火墙阻止了直传<br>
+        • 视频文件过大<br><br>
+        <strong>解决方法：</strong><br>
+        • 1. 打开<a href="https://console.cloud.tencent.com/cos/bucket" target="_blank" style="color:#4fc3f7">腾讯云COS控制台</a><br>
+        • 2. 进入存储桶 → 安全管理 → CORS规则<br>
+        • 3. 添加规则：Origin设为 * , Method设为 PUT/HEAD<br>
+        • 4. 刷新页面重试<br>
         </div>
       `);
     };
 
-    xhr.send(formData);
+    xhr.send(file);
   } catch (e) {
     console.error('COS upload error:', e);
     showError('上传错误: ' + e.message);

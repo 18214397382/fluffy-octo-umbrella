@@ -447,16 +447,16 @@ app.post('/api/cos/policy', express.json(), (req, res) => {
   const cosHost = `${TENCENT_COS_BUCKET}.cos.${TENCENT_COS_REGION}.myqcloud.com`;
   const uploadUrl = `https://${cosHost}/`;
 
+  const auth = getCosAuthorization('PUT', '/' + saveKey, '');
+  const fileUrl = `https://${cosHost}/${saveKey}`;
+
   res.status(200).json({
     success: true,
     uploadUrl,
     saveKey,
+    authorization: auth.authorization,
     cosHost,
-    secretId: TENCENT_SECRET_ID,
-    secretKey: TENCENT_SECRET_KEY,
-    bucket: TENCENT_COS_BUCKET,
-    region: TENCENT_COS_REGION,
-    fileUrl: `https://${cosHost}/${saveKey}`,
+    fileUrl,
   });
 });
 
