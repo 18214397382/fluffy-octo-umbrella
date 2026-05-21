@@ -199,25 +199,53 @@ function getCosSignature(secretId, secretKey, keyPath) {
   const now = Math.floor(Date.now() / 1000);
   const keyTime = (now - 3600) + ';' + (now + 3600);
 
-  async function hmacSha1(msg, key) {
-    const cryptoKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(key), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
-    const sig = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(msg));
-    return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+  function sha1(str) {
+    function rotl(n, b) { return (n << b) | (n >>> (32 - b)); }
+    function toHex(n) { return ('0000000' + n.toString(16)).slice(-8); }
+    function strToWords(s) { const w = []; for (let i = 0; i < s.length * 8; i += 8) w[i >> 5] |= (s.charCodeAt(i / 8) & 0xff) << (24 - i % 32); return w; }
+    const w = strToWords(str);
+    let h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
+    w[w.length] = 0; w[w.length] = 0;
+    const blen = w.length;
+    w[blen - 1] = str.length * 8;
+    for (let b = 0; b < blen; b += 16) {
+      const words = w.slice(b, b + 16);
+      for (let i = 16; i < 80; i++) words[i] = rotl(words[i - 3] ^ words[i - 8] ^ words[i - 14] ^ words[i - 16], 1);
+      let a = h0, b2 = h1, c = h2, d = h3, e = h4;
+      for (let i = 0; i < 80; i++) {
+        let f, k;
+        if (i < 20) { f = (b2 & c) | ((~b2) & d); k = 0x5A827999; }
+        else if (i < 40) { f = b2 ^ c ^ d; k = 0x6ED9EBA1; }
+        else if (i < 60) { f = (b2 & c) | (b2 & d) | (c & d); k = 0x8F1BBCDC; }
+        else { f = b2 ^ c ^ d; k = 0xCA62C1D6; }
+        const temp = (rotl(a, 5) + f + e + k + words[i]) | 0;
+        e = d; d = c; c = rotl(b2, 30); b2 = a; a = temp;
+      }
+      h0 = (h0 + a) | 0; h1 = (h1 + b2) | 0; h2 = (h2 + c) | 0; h3 = (h3 + d) | 0; h4 = (h4 + e) | 0;
+    }
+    return toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4);
   }
 
-  async function sha1(msg) {
-    const sig = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(msg));
-    return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+  function hmacSha1(msg, key) {
+    const blockSize = 64;
+    if (key.length > blockSize) key = sha1(key);
+    while (key.length < blockSize * 2) key += '\x00';
+    const k1 = '', k2 = '';
+    let oKeyPad = '', iKeyPad = '';
+    for (let i = 0; i < blockSize; i++) {
+      const kc = key.charCodeAt(i) || 0;
+      oKeyPad += String.fromCharCode(kc ^ 0x5c);
+      iKeyPad += String.fromCharCode(kc ^ 0x36);
+    }
+    return sha1(oKeyPad + sha1(iKeyPad + msg));
   }
 
-  return (async () => {
-    const signKey = await hmacSha1(keyTime, secretKey);
-    const httpString = 'put\n' + keyPath + '\n\n';
-    const sha1edHttpString = await sha1(httpString);
-    const stringToSign = 'sha1\n' + keyTime + '\n' + sha1edHttpString + '\n';
-    const signature = await hmacSha1(stringToSign, signKey);
-    return 'q-sign-algorithm=sha1&q-ak=' + secretId + '&q-sign-time=' + keyTime + '&q-key-time=' + keyTime + '&q-header-list=&q-url-param-list=&q-signature=' + signature;
-  })();
+  const signKey = hmacSha1(keyTime, secretKey);
+  const httpString = 'put\n' + keyPath + '\n\n';
+  const sha1edHttpString = sha1(httpString);
+  const stringToSign = 'sha1\n' + keyTime + '\n' + sha1edHttpString + '\n';
+  const signature = hmacSha1(stringToSign, signKey);
+  return 'q-sign-algorithm=sha1&q-ak=' + secretId + '&q-sign-time=' + keyTime + '&q-key-time=' + keyTime + '&q-header-list=&q-url-param-list=&q-signature=' + signature;
 }
 
 let selectedFile = null;
@@ -401,7 +429,7 @@ async function startCosUpload() {
       authHeader = policyData.authorization;
     } else {
       uploadUrl = `https://${policyData.cosHost}/${policyData.saveKey}`;
-      authHeader = await getCosSignature(policyData.secretId, policyData.secretKey, policyData.saveKey);
+      authHeader = getCosSignature(policyData.secretId, policyData.secretKey, policyData.saveKey);
     }
 
     console.log('[Tencent] Upload URL:', uploadUrl);

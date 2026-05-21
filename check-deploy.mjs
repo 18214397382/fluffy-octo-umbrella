@@ -5,21 +5,19 @@ const ENV_ID = '0e08f177-7ed5-4de2-8724-45ca5486257b';
 const headers = { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
 const gql = (q) => fetch('https://backboard.railway.app/graphql/v2', { method: 'POST', headers, body: JSON.stringify({ query: q }) }).then(r => r.json());
 
-// 查看 serviceInstanceDeployV2 的参数
-const r1 = await gql(`{
-  __type(name: "ServiceInstanceDeployV2Input") {
-    inputFields { name type { name kind } }
+// 先获取所有环境
+const r0 = await gql(`{
+  project(id: "pacific-intuition") {
+    environments { id name }
   }
 }`);
-console.log('Input schema:', JSON.stringify(r1, null, 2));
+console.log('Environments:', JSON.stringify(r0.data?.project?.environments, null, 2));
 
-// 尝试使用 input 包裹
-const r2 = await gql(`mutation {
-  serviceInstanceDeployV2(input: {
-    serviceId: "${SERVICE_ID}",
-    environmentId: "${ENV_ID}",
-    buildOnly: false,
-    source: "REPO"
-  })
+// 获取部署配置
+const r1 = await gql(`{
+  service(id: "${SERVICE_ID}") {
+    source { ... on GitHubSource { repo branch } ... on DockerSource { image } ... on RepoSettings { repo branch } }
+    deployments(last: 5) { edges { node { id status createdAt meta { commitHash commitMessage } } } }
+  }
 }`);
-console.log('Deploy result:', JSON.stringify(r2, null, 2));
+console.log('Service:', JSON.stringify(r1.data?.service, null, 2));
