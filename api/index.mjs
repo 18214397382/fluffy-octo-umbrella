@@ -464,46 +464,74 @@ app.post('/api/cos/policy', express.json(), (req, res) => {
   });
 });
 
-app.post('/api/cos/upload', upload.single('video'), async (req, res) => {
+app.post('/api/cos/upload', (req, res, next) => {
+  if (req.body && req.body.cosUrl && !req.headers['content-type']?.includes('multipart')) {
+    next();
+  } else if (req.headers['content-type']?.includes('multipart')) {
+    upload.single('video')(req, res, next);
+  } else {
+    next();
+  }
+}, async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: '视频文件是必需的' });
+    let buffer, fileName, fileMime, fileUrl, saveKey;
+
+    if (req.body && req.body.cosUrl) {
+      saveKey = req.body.saveKey || '';
+      fileUrl = req.body.cosUrl;
+      fileName = req.body.fileName || 'video.mp4';
+      fileMime = req.body.fileMime || 'video/mp4';
+
+      taskStore.set('_process_' + Date.now(), { fileUrl, saveKey, fileName, fileMime });
+    } else if (req.file) {
+      fileName = req.body.fileName || req.file.originalname;
+      saveKey = `uploads/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      fileUrl = `https://${TENCENT_COS_BUCKET}.cos.${TENCENT_COS_REGION}.myqcloud.com/${saveKey}`;
+
+      console.log(`[COS SDK] Uploading ${saveKey} (${(req.file.size / 1024 / 1024).toFixed(1)}MB)`);
+
+      await COS_CLIENT.putObject({
+        Bucket: TENCENT_COS_BUCKET,
+        Region: TENCENT_COS_REGION,
+        Key: saveKey,
+        Body: req.file.buffer,
+        ContentLength: req.file.size,
+        ContentType: req.file.mimetype || 'video/mp4',
+      });
+
+      console.log(`[COS SDK] Upload success`);
+      buffer = req.file.buffer;
+      fileMime = req.file.mimetype || 'video/mp4';
+    } else {
+      return res.status(400).json({ success: false, message: '缺少视频文件或cosUrl' });
     }
 
-    const fileName = req.body.fileName || req.file.originalname;
-    const saveKey = `uploads/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-    const fileUrl = `https://${TENCENT_COS_BUCKET}.cos.${TENCENT_COS_REGION}.myqcloud.com/${saveKey}`;
-
-    console.log(`[COS SDK] Uploading ${saveKey} (${(req.file.size / 1024 / 1024).toFixed(1)}MB)`);
-
-    const result = await COS_CLIENT.putObject({
-      Bucket: TENCENT_COS_BUCKET,
-      Region: TENCENT_COS_REGION,
-      Key: saveKey,
-      Body: req.file.buffer,
-      ContentLength: req.file.size,
-      ContentType: req.file.mimetype || 'video/mp4',
-    });
-
-    console.log(`[COS SDK] Success:`, result.statusCode);
-
     const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    taskStore.set(taskId, {
+    const taskData = {
       status: 'processing',
       progress: 5,
       currentStep: '文件已上传，正在处理...',
       createdAt: Date.now(),
       modelType: req.body.modelType || 'local-basic',
       modelProvider: req.body.modelProvider || 'local',
-      videoBuffer: req.file.buffer,
       fileName: fileName,
-      fileMime: req.file.mimetype || 'video/mp4',
+      fileMime: fileMime,
       style: req.body.style || 'trending',
       duration: parseInt(req.body.duration || '30'),
       addMusic: 'true',
       addCaptions: 'true',
       features: '[]',
-    });
+    };
+
+    if (buffer) {
+      taskData.videoBuffer = buffer;
+    }
+    if (fileUrl) {
+      taskData.videoUrl = fileUrl;
+      taskData.cosSaveKey = saveKey;
+    }
+
+    taskStore.set(taskId, taskData);
 
     setImmediate(() => processTask(taskId));
 
