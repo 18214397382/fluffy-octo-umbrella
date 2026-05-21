@@ -402,34 +402,15 @@ async function startCosUpload() {
 
     statusText.textContent = '正在上传到腾讯云COS...';
 
-    let uploadUrl;
-    let authHeader;
-
-    if (policyData.authorization) {
-      uploadUrl = policyData.uploadUrl + policyData.saveKey;
-      authHeader = policyData.authorization;
-    } else {
-      uploadUrl = `https://${policyData.cosHost}/${policyData.saveKey}`;
-      const now = Math.floor(Date.now() / 1000);
-      const keyTime = (now - 3600) + ';' + (now + 3600);
-      const signKey = hmacSha1(keyTime, policyData.secretKey);
-      const httpString = 'put\n/' + policyData.saveKey + '\n\n\n';
-      const sha1edHttpString = sha1(httpString);
-      const stringToSign = 'sha1\n' + keyTime + '\n' + sha1edHttpString + '\n';
-      const signature = hmacSha1(stringToSign, signKey);
-      authHeader = 'q-sign-algorithm=sha1&q-ak=' + policyData.secretId + '&q-sign-time=' + keyTime + '&q-key-time=' + keyTime + '&q-header-list=&q-url-param-list=&q-signature=' + signature;
-    }
-
-    console.log('[Tencent] Upload URL:', uploadUrl);
+    const formData = new FormData();
+    formData.append('video', file);
+    formData.append('fileName', file.name);
 
     const xhr = new XMLHttpRequest();
-    xhr.open('PUT', uploadUrl, true);
+    xhr.open('POST', `${API_BASE}/api/cos/upload`, true);
     xhr.timeout = 600000;
 
-    xhr.setRequestHeader('Authorization', authHeader);
-    xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
-
-    console.log('[Tencent] Direct upload to COS...');
+    console.log('[Tencent] Upload via proxy...');
 
     let lastProgress = 0;
 
@@ -437,7 +418,7 @@ async function startCosUpload() {
       if (e.lengthComputable) {
         const pct = Math.max(lastProgress, 5 + Math.round((e.loaded / e.total) * 50));
         progressFill.style.width = pct + '%';
-        statusText.textContent = `腾讯云上传 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
+        statusText.textContent = `上传中 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
         lastProgress = pct;
       }
     };
@@ -455,31 +436,45 @@ async function startCosUpload() {
       clearInterval(keepAlive);
       console.log('[Tencent] Upload Response:', xhr.status);
 
-      if (xhr.status >= 200 && xhr.status < 300) {
-        progressFill.style.width = '60%';
-        statusText.textContent = '✅ 上传完成，启动AI处理...';
+      if (xhr.status === 200) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.success) {
+            progressFill.style.width = '60%';
+            statusText.textContent = '✅ 上传完成，启动AI处理...';
 
-        const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            videoUrl: policyData.fileUrl,
-            style: selectedStyle,
-            duration: document.getElementById('duration').value || '30',
-            modelType: selectedModel,
-            modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
-            cosSaveKey: policyData.saveKey,
-          }),
-        });
+            const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                videoUrl: data.fileUrl,
+                style: selectedStyle,
+                duration: document.getElementById('duration').value || '30',
+                modelType: selectedModel,
+                modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
+                cosSaveKey: data.saveKey,
+              }),
+            });
 
-        const startData = await startRes.json();
-        if (startData.success) {
-          startPolling(startData.taskId);
-        } else {
-          showError(startData.message || '启动失败');
+            const startData = await startRes.json();
+            if (startData.success) {
+              startPolling(startData.taskId);
+            } else {
+              showError(startData.message || '启动失败');
+            }
+          } else {
+            showError(data.message || '上传失败');
+          }
+        } catch (e) {
+          showError('响应解析错误');
         }
       } else {
-        showError(`腾讯云上传失败: HTTP ${xhr.status}`);
+        try {
+          const errData = JSON.parse(xhr.responseText);
+          showError(errData.message || `上传失败: HTTP ${xhr.status}`);
+        } catch(e) {
+          showError(`上传失败: HTTP ${xhr.status}`);
+        }
       }
     };
 
@@ -491,24 +486,10 @@ async function startCosUpload() {
     xhr.onerror = () => {
       clearInterval(keepAlive);
       console.error('[Tencent] Network error');
-      showError(`
-        <div style="text-align:left;font-size:13px;margin-top:8px">
-        <strong>⚠️ 腾讯云直传失败</strong><br><br>
-        这是浏览器直接上传到腾讯云，不经过Railway服务器。<br><br>
-        可能原因：<br>
-        • 腾讯云CORS配置未开启（需要在腾讯云控制台配置）<br>
-        • 网络防火墙阻止了直传<br>
-        • 视频文件过大<br><br>
-        <strong>解决方法：</strong><br>
-        • 1. 打开<a href="https://console.cloud.tencent.com/cos/bucket" target="_blank" style="color:#4fc3f7">腾讯云COS控制台</a><br>
-        • 2. 进入存储桶 → 安全管理 → CORS规则<br>
-        • 3. 添加规则：Origin设为 * , Method设为 PUT/HEAD<br>
-        • 4. 刷新页面重试<br>
-        </div>
-      `);
+      showError('网络错误，上传失败');
     };
 
-    xhr.send(file);
+    xhr.send(formData);
   } catch (e) {
     console.error('COS upload error:', e);
     showError('上传过程出错: ' + e.message);
