@@ -44,7 +44,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .status-card { display: none; }
 .status-card.show { display: block; }
 .progress-bar { width: 100%; height: 8px; background: #0f0f13; border-radius: 4px; overflow: hidden; margin: 16px 0; }
-.progress-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: 4px; transition: width .5s; width: 0; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: 4px; transition: width .3s ease; width: 0; }
 .status-text { text-align: center; font-size: 15px; color: #94a3b8; }
 .status-text.processing { color: #6366f1; }
 .status-text.completed { color: #22c55e; }
@@ -435,7 +435,7 @@ async function startCosUpload() {
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
-        const pct = 5 + Math.round((e.loaded / e.total) * 50);
+        const pct = Math.max(lastProgress, 5 + Math.round((e.loaded / e.total) * 50));
         progressFill.style.width = pct + '%';
         statusText.textContent = `腾讯云上传 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
         lastProgress = pct;
