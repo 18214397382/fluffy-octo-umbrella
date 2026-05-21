@@ -773,9 +773,21 @@ async function processTask(taskId) {
 }
 
 async function downloadVideo(url) {
+  const cosMatch = url.match(/\.cos\.([^.]+)\.myqcloud\.com\/(.+)/);
+  if (cosMatch) {
+    const region = cosMatch[1];
+    const key = decodeURIComponent(cosMatch[2]);
+    return new Promise((resolve, reject) => {
+      COS_CLIENT.getObject({ Bucket: TENCENT_COS_BUCKET, Region: region, Key: key }, (err, data) => {
+        if (err) reject(new Error(err.code || err.message));
+        else resolve(data.Body);
+      });
+    });
+  }
+
   return new Promise((resolve, reject) => {
     const protocol = url.startsWith('https') ? https : http;
-    protocol.get(url, (response) => {
+    protocol.get(url, { timeout: 60000 }, (response) => {
       if (response.statusCode !== 200) {
         reject(new Error(`HTTP ${response.statusCode}`));
         return;
@@ -847,8 +859,39 @@ function processUrlTask(taskId) {
   if (!task) return;
   const { videoUrl, modelType } = task;
 
+  taskStore.set(taskId, { ...taskStore.get(taskId), currentStep: '正在下载视频...', progress: 3 });
+
+  const cosMatch = videoUrl.match(/\.cos\.([^.]+)\.myqcloud\.com\/(.+)/);
+  if (cosMatch) {
+    const region = cosMatch[1];
+    const key = decodeURIComponent(cosMatch[2]);
+    taskStore.set(taskId, { ...taskStore.get(taskId), currentStep: `正在从腾讯云下载视频...`, progress: 5 });
+
+    COS_CLIENT.getObject({
+      Bucket: TENCENT_COS_BUCKET,
+      Region: region,
+      Key: key,
+    }, (err, data) => {
+      if (err) {
+        taskStore.set(taskId, { ...taskStore.get(taskId), status: 'error', currentStep: `从腾讯云下载失败: ${err.code || err.message}` });
+        return;
+      }
+      taskStore.set(taskId, {
+        ...taskStore.get(taskId),
+        videoBuffer: data.Body,
+        fileName: 'downloaded_video.mp4',
+        fileMime: data.headers?.['content-type'] || 'video/mp4',
+        progress: 30,
+        currentStep: '下载完成，正在处理...',
+      });
+      task.videoBuffer = data.Body;
+      simulateLocalProcessing(taskId, modelType);
+    });
+    return;
+  }
+
   const protocol = videoUrl.startsWith('https') ? https : http;
-  protocol.get(videoUrl, (response) => {
+  protocol.get(videoUrl, { timeout: 60000 }, (response) => {
     const chunks = [];
     let downloaded = 0;
     const total = parseInt(response.headers['content-length'] || '0');
