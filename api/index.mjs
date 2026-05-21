@@ -486,11 +486,33 @@ app.post('/api/cos/upload', upload.single('video'), async (req, res) => {
     });
 
     console.log(`[COS SDK] Success:`, result.statusCode);
+
+    const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    taskStore.set(taskId, {
+      status: 'processing',
+      progress: 5,
+      currentStep: '文件已上传，正在处理...',
+      createdAt: Date.now(),
+      modelType: 'local-basic',
+      modelProvider: 'local',
+      videoBuffer: req.file.buffer,
+      fileName: fileName,
+      fileMime: req.file.mimetype || 'video/mp4',
+      style: 'trending',
+      duration: 30,
+      addMusic: 'true',
+      addCaptions: 'true',
+      features: '[]',
+    });
+
+    setImmediate(() => processTask(taskId));
+
     res.status(200).json({
       success: true,
       fileUrl,
       saveKey,
-      message: '上传到腾讯云成功',
+      taskId,
+      message: '上传成功，AI处理已启动',
     });
   } catch (e) {
     console.error('[COS SDK] Error:', e.code || e.message);
