@@ -410,10 +410,16 @@ async function startCosUpload() {
         SecretKey: policyData.secretKey,
       });
 
+      const bucket = policyData.bucket || (policyData.cosHost ? policyData.cosHost.split('.')[0] : 'ai-video-uploads-1330620623-1325485155');
+      const region = policyData.region || 'ap-guangzhou';
+      const key = policyData.saveKey.replace(/^\//, '');
+
+      console.log('[COS] Bucket:', bucket, 'Region:', region, 'Key:', key);
+
       cos.putObject({
-        Bucket: policyData.bucket || policyData.cosHost?.split('.')[0] || 'ai-video-uploads-1330620623-1325485155',
-        Region: policyData.region || 'ap-guangzhou',
-        Key: policyData.saveKey.replace(/^\//, ''),
+        Bucket: bucket,
+        Region: region,
+        Key: key,
         Body: file,
         ContentLength: file.size,
         onProgress: (e) => {

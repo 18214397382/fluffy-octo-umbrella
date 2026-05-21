@@ -456,6 +456,10 @@ app.post('/api/cos/policy', express.json(), (req, res) => {
     saveKey,
     authorization: auth.authorization,
     cosHost,
+    secretId: TENCENT_SECRET_ID,
+    secretKey: TENCENT_SECRET_KEY,
+    bucket: TENCENT_COS_BUCKET,
+    region: TENCENT_COS_REGION,
     fileUrl,
   });
 });
