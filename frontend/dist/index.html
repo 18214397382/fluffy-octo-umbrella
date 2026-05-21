@@ -195,6 +195,28 @@ if (window.location.hostname.includes('fluffy-octo-umbrella')) {
   document.write('<div style="height:48px"></div>');
 }
 
+function getCosSignature(secretId, secretKey, keyPath) {
+  const now = Math.floor(Date.now() / 1000);
+  const keyTime = (now - 3600) + ';' + (now + 3600);
+
+  async function sha1(msg, key) {
+    const k = typeof key === 'string' ? key : '';
+    const data = typeof msg === 'string' ? new TextEncoder().encode(msg) : msg;
+    const cryptoKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(k), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+    const sig = await crypto.subtle.sign('HMAC', cryptoKey, data);
+    return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  return (async () => {
+    const signKey = await sha1(keyTime, secretKey);
+    const httpString = 'put\n' + keyPath + '\n\n';
+    const sha1edHttpString = await sha1(httpString, '');
+    const stringToSign = 'sha1\n' + keyTime + '\n' + sha1edHttpString + '\n';
+    const signature = await sha1(stringToSign, signKey);
+    return 'q-sign-algorithm=sha1&q-ak=' + secretId + '&q-sign-time=' + keyTime + '&q-key-time=' + keyTime + '&q-header-list=&q-url-param-list=&q-signature=' + signature;
+  })();
+}
+
 let selectedFile = null;
 let selectedStyle = 'trending';
 let selectedModel = 'local-basic';
@@ -368,11 +390,24 @@ async function startCosUpload() {
 
     statusText.textContent = '正在上传到腾讯云COS...';
 
+    let uploadUrl;
+    let authHeader;
+
+    if (policyData.authorization) {
+      uploadUrl = policyData.uploadUrl + policyData.saveKey;
+      authHeader = policyData.authorization;
+    } else {
+      uploadUrl = `https://${policyData.cosHost}/${policyData.saveKey}`;
+      authHeader = await getCosSignature(policyData.secretId, policyData.secretKey, policyData.saveKey);
+    }
+
+    console.log('[Tencent] Upload URL:', uploadUrl);
+
     const xhr = new XMLHttpRequest();
-    xhr.open('PUT', policyData.uploadUrl + policyData.saveKey, true);
+    xhr.open('PUT', uploadUrl, true);
     xhr.timeout = 600000;
 
-    xhr.setRequestHeader('Authorization', policyData.authorization);
+    xhr.setRequestHeader('Authorization', authHeader);
     xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
 
     console.log('[Tencent] Direct upload to COS...');
