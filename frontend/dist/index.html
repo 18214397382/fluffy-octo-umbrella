@@ -400,106 +400,58 @@ async function startCosUpload() {
       return;
     }
 
-    statusText.textContent = '正在上传到腾讯云COS...';
+    statusText.textContent = '正在上传到腾讯云（会慢一些，请耐心等待）...';
     progressFill.style.width = '5%';
 
-    if (policyData.authorization) {
-      const uploadUrl = policyData.uploadUrl + policyData.saveKey;
+    const formData = new FormData();
+    formData.append('video', file);
+    formData.append('fileName', file.name);
+    formData.append('style', selectedStyle);
+    formData.append('duration', document.getElementById('duration').value || '30');
+    formData.append('modelType', selectedModel);
+    formData.append('modelProvider', selectedModel.startsWith('cloud') ? 'cloud' : 'local');
 
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', uploadUrl, true);
-      xhr.timeout = 600000;
-      xhr.setRequestHeader('Authorization', policyData.authorization);
-      xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/api/cos/upload`, true);
+    xhr.timeout = 600000;
 
-      let lastProgress = 0;
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          const pct = Math.max(lastProgress, Math.round((e.loaded / e.total) * 60));
-          progressFill.style.width = pct + '%';
-          statusText.textContent = `上传中 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
-          lastProgress = pct;
+    let lastProgress = 0;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.max(lastProgress, Math.round((e.loaded / e.total) * 60));
+        progressFill.style.width = pct + '%';
+        statusText.textContent = `上传中 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
+        lastProgress = pct;
+      }
+    };
+
+    xhr.onload = () => {
+      console.log('[COS] Upload Response:', xhr.status);
+      if (xhr.status === 200) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.success) {
+            progressFill.style.width = '65%';
+            statusText.textContent = '✅ 上传完成，AI处理已启动';
+            if (data.taskId) startPolling(data.taskId);
+            else showError('服务端未返回任务ID');
+          } else {
+            showError(data.message || '上传失败');
+          }
+        } catch(e) {
+          showError('响应解析错误');
         }
-      };
-
-      xhr.onload = async () => {
-        console.log('[COS] Direct upload status:', xhr.status);
-        if (xhr.status >= 200 && xhr.status < 300) {
-          progressFill.style.width = '65%';
-          statusText.textContent = '✅ 上传完成，正在启动AI处理...';
-
-          const startRes = await fetch(`${API_BASE}/api/ai-edit/start-url`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              videoUrl: policyData.fileUrl,
-              style: selectedStyle,
-              duration: document.getElementById('duration').value || '30',
-              modelType: selectedModel,
-              modelProvider: selectedModel.startsWith('cloud') ? 'cloud' : 'local',
-              cosSaveKey: policyData.saveKey,
-            }),
-          });
-          const startData = await startRes.json();
-          if (startData.success) startPolling(startData.taskId);
-          else showError(startData.message || '启动失败');
-        } else {
+      } else {
+        try {
+          const errData = JSON.parse(xhr.responseText);
+          showError(errData.message || `上传失败: HTTP ${xhr.status}`);
+        } catch(e) {
           showError(`上传失败: HTTP ${xhr.status}`);
         }
-      };
-
-      xhr.onerror = () => showError('网络错误，上传失败');
-      xhr.send(file);
-    } else {
-      const formData = new FormData();
-      formData.append('video', file);
-      formData.append('fileName', file.name);
-      formData.append('style', selectedStyle);
-      formData.append('duration', document.getElementById('duration').value || '30');
-      formData.append('modelType', selectedModel);
-      formData.append('modelProvider', selectedModel.startsWith('cloud') ? 'cloud' : 'local');
-
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${API_BASE}/api/cos/upload`, true);
-      xhr.timeout = 600000;
-
-      let lastProgress = 0;
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          const pct = Math.max(lastProgress, Math.round((e.loaded / e.total) * 60));
-          progressFill.style.width = pct + '%';
-          statusText.textContent = `上传中 ${Math.round(e.loaded / 1024 / 1024)}MB / ${Math.round(e.total / 1024 / 1024)}MB`;
-          lastProgress = pct;
-        }
-      };
-
-      xhr.onload = () => {
-        console.log('[COS] Upload Response:', xhr.status);
-        if (xhr.status === 200) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            if (data.success) {
-              progressFill.style.width = '65%';
-              statusText.textContent = '✅ 上传完成，AI处理已启动';
-              if (data.taskId) startPolling(data.taskId);
-            } else {
-              showError(data.message || '上传失败');
-            }
-          } catch(e) {
-            showError('响应解析错误');
-          }
-        } else {
-          try {
-            const errData = JSON.parse(xhr.responseText);
-            showError(errData.message || `上传失败: HTTP ${xhr.status}`);
-          } catch(e) {
-            showError(`上传失败: HTTP ${xhr.status}`);
-          }
-        }
-      };
-      xhr.onerror = () => showError('网络错误，请重试');
-      xhr.send(formData);
-    }
+      }
+    };
+    xhr.onerror = () => showError('网络错误，请重试');
+    xhr.send(formData);
   } catch (e) {
     console.error('COS upload error:', e);
     showError('上传过程出错: ' + e.message);
